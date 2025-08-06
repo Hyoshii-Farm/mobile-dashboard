@@ -32,7 +32,7 @@ const backArrowSvg = `
 
 const calendarSvg = `
 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="teal" stroke-width="1.5">
-  <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 7.5h18M4.5 6.75h15A1.5 1.5 0 0 1 21 8.25v11.25a1.5 1.5 0 0 1-1.5 1.5h-15a1.5 1.5 0 0 1-1.5-1.5V8.25a1.5 1.5 0 0 1 1.5-1.5Z" />
+  <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 7.5h18M4.5 6.75h15A1.5 1.5 0 0 1 21 8.25v11.25a1.5 1.5 0 0 1-1.5 1.5h-15a1.5 1.5 0 0 1-1.5-1.5Z" />
 </svg>
 `;
 
@@ -74,10 +74,30 @@ export default function FormPesticideUsage() {
 
   const [dropdownOpen, setDropdownOpen] = useState(dropdownOpenDefault);
 
-  const lokasiOptions = ['Green House 1', 'Green House 2', 'Outdoor 1', 'Nursery 1'];
-  const hamaOptions = ['Antraknosa', 'Aphids', 'Botrytis', 'Fusarium'];
-  const pestisidaOptions = ['Amistar', 'Lannate', 'Regent', 'Switch'];
-  const penggunaanOptions = ['Penyemprotan', 'Perendaman', 'Lainnya'];
+  const lokasiOptions = [
+    'Green House 1', 'Green House 2', 'Green House 3', 'Green House 4', 'Green House 5',
+    'Outdoor 1', 'Outdoor 2', 'Outdoor 2 Baru', 'Outdoor 3', 'Outdoor 4',
+    'Outdoor 5', 'Outdoor 6', 'Outdoor 7', 'Nursery 1', 'Nursery 2'
+  ];
+
+  const hamaOptions = [
+    'Antraknosa', 'Aphids', 'Botrytis', 'Erwinia',
+    'Fusarium', 'Jamur Hijau', 'Lalat', 'Lebah',
+    'Mildew Insidensi', 'Mildew Intensitas', 'N. Cucumeris', 'Orius SP',
+    'Powdery Mildew', 'SM', 'Siput', 'Spidermites', 'Thrips', 'Ulat', 'WFT'
+  ];
+
+  const pestisidaOptions = [
+    'Abacel', 'Agrimic', 'Alika', 'Amistar', 'Amistar Top', 'Atoza', 'BP60', 'Bactosin',
+    'Benlox', 'Bion M', 'Biopesticide', 'Buldok', 'Cabrio', 'Cyflumetofen', 'Daconil', 'Decis',
+    'Dense', 'Easy', 'Elestal Neo', 'Endure', 'Explore', 'Flazz', 'Folirfos', 'Furadan', 'Gracia',
+    'Inazeb', 'Lannate', 'Luna Smart', 'Merivon', 'Metarizep', 'Miravis Duo', 'Movento', 'Nordox',
+    'Orondis Opti', 'Orthene', 'P04', 'Pegasus', 'Pemulus', 'Pevicure', 'Regent', 'Revus Optio',
+    'Ridomil Gold', 'Rotraz', 'Rovral', 'SagriFlaz', 'Samite', 'Score', 'Seruni', 'Seudoflor',
+    'Sidametrin', 'Simodis', 'Sivanto', 'Switch', 'Tangker', 'Topsin M', 'Trivia', 'Ziflo'
+  ];
+
+  const penggunaanOptions = ['Spray', 'Fogging', 'Kocor'];
 
   const closeAllDropdowns = () => setDropdownOpen(dropdownOpenDefault);
 
@@ -139,21 +159,42 @@ export default function FormPesticideUsage() {
   };
 
   const resetForm = () => {
-  setTanggal(null);
-  setLokasi('');
-  setHama('');
-  setPestisida('');
-  setBahanAktif('');
-  setPenggunaan1('');
-  setDosisValue('');
-  setDosisUnit('ml');
-  setPenggunaan2('');
-  setSuhu('');
-  setTenagaKerja('');
-  setPhoto(null);
-  setStartTime(null);
-  setEndTime(null);
-  setDropdownOpen(dropdownOpenDefault);
+    setTanggal(null);
+    setLokasi('');
+    setHama('');
+    setPestisida('');
+    setBahanAktif('');
+    setPenggunaan1('');
+    setDosisValue('');
+    setDosisUnit('ml');
+    setPenggunaan2('');
+    setSuhu('');
+    setTenagaKerja('');
+    setPhoto(null);
+    setStartTime(null);
+    setEndTime(null);
+    setDropdownOpen(dropdownOpenDefault);
+  };
+
+  const handleAdd = () => {
+    if (
+      !tanggal ||
+      !lokasi ||
+      !hama ||
+      !pestisida ||
+      !bahanAktif ||
+      !penggunaan1 ||
+      !dosisValue ||
+      !penggunaan2 ||
+      !suhu ||
+      !startTime ||
+      !endTime ||
+      !tenagaKerja
+    ) {
+      Alert.alert('Form Incomplete', 'Please fill in all required fields (*) before submitting.');
+      return;
+    }
+    console.log('Form submitted');
   };
 
   return (
@@ -167,7 +208,9 @@ export default function FormPesticideUsage() {
 
           {/* Tanggal */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Tanggal *</Text>
+            <Text style={styles.label}>
+              Tanggal <Text style={{ color: '#8B2D2D' }}>*</Text>
+            </Text>
             <TouchableOpacity style={styles.dateBox} onPress={() => setShowTanggal(true)}>
               <Text style={styles.dateText}>{tanggal ? tanggal.toLocaleDateString() : ''}</Text>
               <SvgXml xml={calendarSvg} width={20} height={20} />
@@ -187,25 +230,39 @@ export default function FormPesticideUsage() {
 
           {/* Lokasi */}
           <View style={styles.fieldSpacing}>
-            <DropdownInput label="Lokasi *" value={lokasi} onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, lokasi: !prev.lokasi }))} />
+            <DropdownInput
+              label={<Text>Lokasi <Text style={{ color: '#8B2D2D' }}>*</Text></Text>}
+              value={lokasi}
+              onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, lokasi: !prev.lokasi }))}
+            />
             {dropdownOpen.lokasi && <DropdownBox items={lokasiOptions} onSelect={(option) => { setLokasi(option); closeAllDropdowns(); }} />}
           </View>
 
           {/* Hama */}
           <View style={styles.fieldSpacing}>
-            <DropdownInput label="Hama *" value={hama} onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, hama: !prev.hama }))} />
+            <DropdownInput
+              label={<Text>Hama <Text style={{ color: '#8B2D2D' }}>*</Text></Text>}
+              value={hama}
+              onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, hama: !prev.hama }))}
+            />
             {dropdownOpen.hama && <DropdownBox items={hamaOptions} onSelect={(option) => { setHama(option); closeAllDropdowns(); }} />}
           </View>
 
           {/* Pestisida */}
           <View style={styles.fieldSpacing}>
-            <DropdownInput label="Pestisida *" value={pestisida} onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, pestisida: !prev.pestisida }))} />
+            <DropdownInput
+              label={<Text>Pestisida <Text style={{ color: '#8B2D2D' }}>*</Text></Text>}
+              value={pestisida}
+              onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, pestisida: !prev.pestisida }))}
+            />
             {dropdownOpen.pestisida && <DropdownBox items={pestisidaOptions} onSelect={(option) => { setPestisida(option); setBahanAktif(option); closeAllDropdowns(); }} />}
           </View>
 
           {/* Bahan Aktif */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Bahan Aktif *</Text>
+            <Text style={styles.label}>
+              Bahan Aktif <Text style={{ color: '#8B2D2D' }}>*</Text>
+            </Text>
             <View style={styles.readOnlyBox}>
               <Text style={styles.readOnlyText}>{bahanAktif || ''}</Text>
             </View>
@@ -213,13 +270,19 @@ export default function FormPesticideUsage() {
 
           {/* Penggunaan 1 */}
           <View style={styles.fieldSpacing}>
-            <DropdownInput label="Penggunaan *" value={penggunaan1} onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, penggunaan1: !prev.penggunaan1 }))} />
+            <DropdownInput
+              label={<Text>Penggunaan <Text style={{ color: '#8B2D2D' }}>*</Text></Text>}
+              value={penggunaan1}
+              onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, penggunaan1: !prev.penggunaan1 }))}
+            />
             {dropdownOpen.penggunaan1 && <DropdownBox items={penggunaanOptions} onSelect={(option) => { setPenggunaan1(option); closeAllDropdowns(); }} />}
           </View>
 
           {/* Dosis */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Dosis (per Liter) *</Text>
+            <Text style={styles.label}>
+              Dosis (per Liter) <Text style={{ color: '#8B2D2D' }}>*</Text>
+            </Text>
             <View style={styles.unitBox}>
               <View style={styles.unitInputArea}>
                 <TextInput style={styles.inputText} value={dosisValue} onChangeText={(val) => setDosisValue(val.replace(/[^0-9.]/g, ''))} keyboardType="numeric" placeholder="0" placeholderTextColor="#999" />
@@ -234,13 +297,17 @@ export default function FormPesticideUsage() {
 
           {/* Jumlah Penggunaan */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Jumlah Penggunaan *</Text>
+            <Text style={styles.label}>
+              Jumlah Penggunaan <Text style={{ color: '#8B2D2D' }}>*</Text>
+            </Text>
             <TextInput style={styles.textInputBox} value={penggunaan2} onChangeText={(val) => setPenggunaan2(val.replace(/[^0-9.]/g, ''))} keyboardType="numeric" placeholder="0" placeholderTextColor="#999" />
           </View>
 
           {/* Suhu */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Suhu *</Text>
+            <Text style={styles.label}>
+              Suhu <Text style={{ color: '#8B2D2D' }}>*</Text>
+            </Text>
             <View style={styles.unitBox}>
               <View style={styles.unitInputArea}>
                 <TextInput style={styles.inputText} value={suhu} onChangeText={(val) => setSuhu(val.replace(/[^0-9.]/g, ''))} keyboardType="numeric" placeholder="0" placeholderTextColor="#999" />
@@ -253,7 +320,9 @@ export default function FormPesticideUsage() {
 
           {/* Durasi */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Durasi *</Text>
+            <Text style={styles.label}>
+              Durasi <Text style={{ color: '#8B2D2D' }}>*</Text>
+            </Text>
             <View style={styles.row}>
               <TouchableOpacity style={styles.timeBox} onPress={() => setShowStart(true)}>
                 <View style={styles.timeLabel}><Text>Start</Text><SvgXml xml={clockSvg} width={18} height={18} /></View>
@@ -294,7 +363,9 @@ export default function FormPesticideUsage() {
 
           {/* Tenaga Kerja */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Tenaga Kerja *</Text>
+            <Text style={styles.label}>
+              Tenaga Kerja <Text style={{ color: '#8B2D2D' }}>*</Text>
+            </Text>
             <View style={styles.unitBox}>
               <View style={styles.unitInputArea}>
                 <TextInput
@@ -314,10 +385,10 @@ export default function FormPesticideUsage() {
 
           {/* Gambar */}
           <ImageUploadBox
-            label="Gambar *"
+            label="Gambar"
             photo={photo}
             onUpload={handleUpload}
-             onRemove={() => setPhoto(null)}
+            onRemove={() => setPhoto(null)}
           />
 
           {/* Buttons */}
@@ -325,16 +396,14 @@ export default function FormPesticideUsage() {
             <RoundedButton
               label="ADD"
               backgroundColor="#1D4949"
-              onPress={() => console.log('Add pressed')}
+              onPress={handleAdd}
             />
             <RoundedButton
               label="RESET"
               backgroundColor="#8B2D2D"
               onPress={resetForm}
             />
-
           </View>
-
         </ScrollView>
       </View>
     </TouchableWithoutFeedback>

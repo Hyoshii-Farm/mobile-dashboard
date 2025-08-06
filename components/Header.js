@@ -9,18 +9,14 @@ import {
   Platform,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { useNavigation } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 
 export default function HomeHeader({
   title = 'HYOSHII FARM',
   logoSvg,
   onLeftPress,
-  showHomeButton = true,
-  profileImage,
+  profileContent,
 }) {
-  const navigation = useNavigation();
-
   const [fontsLoaded] = useFonts({
     'DMSans-Regular': require('../assets/fonts/DM_Sans/static/DMSans-Regular.ttf'),
     'DMSans-Bold': require('../assets/fonts/DM_Sans/static/DMSans-Bold.ttf'),
@@ -43,21 +39,10 @@ export default function HomeHeader({
         <Text style={styles.brand}>{title}</Text>
       </View>
 
-      {showHomeButton && (
-        <TouchableOpacity
-          style={styles.rightContainer}
-          onPress={() => navigation.navigate('Home')}
-        >
-          <Image
-            source={
-              profileImage
-                ? { uri: profileImage }
-                : require('../assets/icon.png')
-            }
-            style={styles.avatar}
-          />
-        </TouchableOpacity>
-      )}
+      {/* Right side: profile avatar or whatever is passed */}
+      <View style={styles.rightContainer}>
+        {profileContent}
+      </View>
     </View>
   );
 }
@@ -98,12 +83,5 @@ const styles = StyleSheet.create({
   rightContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFFFF8',
   },
 });
