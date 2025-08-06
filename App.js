@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LogInPage from './screens/LogInPage';
 import Home from './screens/Home';
 import PesticideUsagePage from './screens/PesticideUsage';
+import FormPesticideUsage from './screens/FormPesticideUsage';
 
 const Stack = createNativeStackNavigator();
 
@@ -18,6 +19,7 @@ export default function App() {
         <Stack.Screen name="LogIn" component={LogInPage} />
         <Stack.Screen name="Home" component={Home} />
         <Stack.Screen name="PesticideUsage" component={PesticideUsagePage} />
+        <Stack.Screen name="FormPesticideUsage" component={FormPesticideUsage} /> 
       </Stack.Navigator>
     </NavigationContainer>
   );

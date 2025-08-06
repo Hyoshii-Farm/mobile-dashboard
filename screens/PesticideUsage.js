@@ -97,7 +97,8 @@ export default function PesticideUsagePage() {
         />
 
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-          <AddNewButton onPress={() => console.log('Add New Data pressed')} />
+          {/* Updated Add New Button to navigate */}
+          <AddNewButton onPress={() => navigation.navigate('FormPesticideUsage')} />
 
           <View style={styles.formSection}>
             <DropdownInput
