@@ -14,6 +14,7 @@ import DropdownInput from '../components/DropdownInput';
 import DropdownBox from '../components/DropdownBox';
 import NumericRangeInput from '../components/NumericRangeInput';
 import CollapsibleMultiselect from '../components/CollapseMulti';
+import SortableTable from '../components/SortableTable';
 
 /** ---------- Config from app.json ---------- */
 const extra = (Constants?.expoConfig?.extra) || (Constants?.manifest?.extra) || {};
@@ -99,7 +100,6 @@ export default function PesticideUsagePage() {
     return `${base}${path}?${p.toString()}`;
   };
 
-  // EXACTLY like in Form: loop through pages until totalPages/last page
   const fetchAllPages = useCallback(async (path, pageSize = PAGE_SIZE) => {
     const headers = await getAuthHeaders();
     const all = [];
@@ -318,6 +318,15 @@ export default function PesticideUsagePage() {
                 )
               }
             />
+
+            {/* Empty table preview */}
+            <View style={{ marginTop: 20 }}>
+              <SortableTable
+                columns={tableColumnOptions} // all columns available
+                data={[]}                    // empty dataset
+                selectedColumns={selectedColumns} // will only show checked columns
+              />
+            </View>
           </View>
         </ScrollView>
       </View>

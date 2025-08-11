@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -39,8 +39,7 @@ const CANDIDATE_ENDPOINTS = {
 
 const getAuthHeaders = async () => ({
   Accept: 'application/json',
-  'Content-Type': 'application/json',
-  // Authorization: `Bearer <token>`,
+  // Authorization: `Bearer <token>`, // put yours if needed
 });
 
 const buildUrl = (path, page = 1, pageSize = PAGE_SIZE) => {
@@ -96,13 +95,15 @@ export default function FormPesticideUsage() {
   const dropdownOpenDefault = { lokasi: false, hama: false, pestisida: false, penggunaan1: false, dosisUnit: false };
   const [dropdownOpen, setDropdownOpen] = useState(dropdownOpenDefault);
 
-  // options from API
-  const [lokasiOptions, setLokasiOptions] = useState([]);     // strings
-  const [hamaOptions, setHamaOptions] = useState([]);         // strings
+  // options + raw objects from API
+  const [lokasiOptions, setLokasiOptions] = useState([]);     // labels
+  const [lokasiObjects, setLokasiObjects] = useState([]);     // raw
+  const [hamaOptions, setHamaOptions] = useState([]);         // labels
+  const [hamaObjects, setHamaObjects] = useState([]);         // raw
 
-  // PESTISIDA: keep full objects + labels (names only)
-  const [pestisidaObjects, setPestisidaObjects] = useState([]); // [{id, name, type, active_ingredient}, ...]
-  const [pestisidaLabels, setPestisidaLabels] = useState([]);   // ["Amistar", "Agrimec", ...]
+  // PESTISIDA
+  const [pestisidaObjects, setPestisidaObjects] = useState([]);
+  const [pestisidaLabels, setPestisidaLabels] = useState([]);
 
   const penggunaanOptions = ['Spray', 'Fogging', 'Kocor'];
 
@@ -120,6 +121,11 @@ export default function FormPesticideUsage() {
     );
   };
 
+  const idFrom = (x, keys) => {
+    for (const k of keys) if (x?.[k] != null) return x[k];
+    return null;
+  };
+
   const fetchAllPages = useCallback(async (path, pageSize = PAGE_SIZE) => {
     const headers = await getAuthHeaders();
     const all = [];
@@ -128,7 +134,6 @@ export default function FormPesticideUsage() {
 
     while (page <= MAX_PAGES) {
       const url = buildUrl(path, page, pageSize);
-      console.log(`[Form fetch] GET ${url}`);
       const res = await fetch(url, { headers });
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
@@ -150,9 +155,7 @@ export default function FormPesticideUsage() {
       const tPages = data?.pagination?.totalPages ?? data?.meta?.totalPages ?? null;
       if (tPages && !totalPagesKnown) totalPagesKnown = Number(tPages);
 
-      if ((totalPagesKnown && page >= totalPagesKnown) || arr.length === 0 || arr.length < pageSize) {
-        break;
-      }
+      if ((totalPagesKnown && page >= totalPagesKnown) || arr.length === 0 || arr.length < pageSize) break;
       page += 1;
     }
     return all;
@@ -161,12 +164,10 @@ export default function FormPesticideUsage() {
   const loadLokasi = useCallback(async () => {
     setLoading((s) => ({ ...s, lokasi: true })); setError(null);
     try {
-      const path = CANDIDATE_ENDPOINTS.lokasi[0];
-      const all = await fetchAllPages(path);
-      let labels = all.map(toLabel).filter(Boolean);
-      labels = Array.from(new Set(labels)).sort((a, b) => a.localeCompare(b));
+      const all = await fetchAllPages(CANDIDATE_ENDPOINTS.lokasi[0]);
+      setLokasiObjects(all);
+      const labels = Array.from(new Set(all.map(toLabel).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
       setLokasiOptions(labels);
-      console.log(`[Form lokasi] totalRows=${all.length} unique=${labels.length}`);
     } catch (e) {
       setError((prev) => (prev ? prev + ' | ' : '') + `Lokasi: ${e?.message || e}`);
     } finally {
@@ -180,10 +181,9 @@ export default function FormPesticideUsage() {
       for (const path of CANDIDATE_ENDPOINTS.hama) {
         try {
           const all = await fetchAllPages(path);
-          let labels = all.map(toLabel).filter(Boolean);
-          labels = Array.from(new Set(labels)).sort((a, b) => a.localeCompare(b));
+          setHamaObjects(all);
+          const labels = Array.from(new Set(all.map(toLabel).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
           setHamaOptions(labels);
-          console.log(`[Form hama] totalRows=${all.length} unique=${labels.length} from ${path}`);
           return;
         } catch (e) {
           console.warn('[Form hama] fallback path failed', path, e?.message || e);
@@ -203,23 +203,14 @@ export default function FormPesticideUsage() {
       for (const path of CANDIDATE_ENDPOINTS.pestisida) {
         try {
           const all = await fetchAllPages(path);
-          // Keep objects; labels are names only (no IDs)
           const objs = all.map((x) => ({
-            id: x?.id ?? null,
+            id: x?.id ?? x?.pesticide_id ?? null,
             name: (x?.name ?? toLabel(x)) || 'Unknown',
             type: x?.type ?? '',
             active_ingredient: x?.active_ingredient ?? x?.activeIngredient ?? '',
           }));
-
-          // names only
-          const labels = objs.map((o) => o.name).sort((a, b) => a.localeCompare(b));
-
-          // sort objects by name to keep index relationship simple
-          const sortedObjs = [...objs].sort((a, b) => a.name.localeCompare(b.name));
-
-          setPestisidaObjects(sortedObjs);
-          setPestisidaLabels(labels);
-          console.log(`[Form pestisida] rows=${objs.length} labels=${labels.length}`);
+          setPestisidaObjects([...objs].sort((a,b)=>a.name.localeCompare(b.name)));
+          setPestisidaLabels(objs.map(o=>o.name).sort((a,b)=>a.localeCompare(b)));
           return;
         } catch (e) {
           console.warn('[Form pestisida] fallback path failed', path, e?.message || e);
@@ -239,12 +230,38 @@ export default function FormPesticideUsage() {
     loadPestisida();
   }, [loadLokasi, loadHama, loadPestisida]);
 
-  const formatTime = (date) => {
-    if (!date) return '';
-    const hrs = date.getHours().toString().padStart(2, '0');
-    const mins = date.getMinutes().toString().padStart(2, '0');
-    return `${hrs}:${mins}`;
-  };
+  // Label -> ID maps
+  const lokasiIdByLabel = useMemo(() => {
+    const m = {};
+    for (const x of lokasiObjects) {
+      const label = toLabel(x);
+      const id = idFrom(x, ['id','location_id','lokasi_id','id_lokasi']);
+      if (label && id != null) m[label] = id;
+    }
+    return m;
+  }, [lokasiObjects]);
+
+  const hamaIdByLabel = useMemo(() => {
+    const m = {};
+    for (const x of hamaObjects) {
+      const label = toLabel(x);
+      const id = idFrom(x, ['id','pest_id','hama_id']);
+      if (label && id != null) m[label] = id;
+    }
+    return m;
+  }, [hamaObjects]);
+
+  const pestisidaIdByLabel = useMemo(() => {
+    const m = {};
+    for (const x of pestisidaObjects) if (x?.name && x?.id != null) m[x.name] = x.id;
+    return m;
+  }, [pestisidaObjects]);
+
+  // ---------- formatters
+  const pad2 = (n) => String(n).padStart(2,'0');
+  const toDateYYYYMMDD = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const toHHMMSS = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}:00`;
+  const formatTime = (d) => (d ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : '');
 
   const calcMinutes = () => {
     if (!startTime || !endTime) return '';
@@ -253,32 +270,19 @@ export default function FormPesticideUsage() {
     return Math.round(diff).toString();
   };
 
+  // image pickers
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      alert('Permission to access gallery is required!');
-      return;
-    }
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-    if (!result.canceled) {
-      setPhoto(result.assets[0].uri);
-    }
+    if (!permissionResult.granted) { alert('Permission to access gallery is required!'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 1 });
+    if (!result.canceled) setPhoto(result.assets[0].uri);
   };
 
   const takePhoto = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permissionResult.granted) {
-      alert('Permission to access camera is required!');
-      return;
-    }
-    let result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 1 });
-    if (!result.canceled) {
-      setPhoto(result.assets[0].uri);
-    }
+    if (!permissionResult.granted) { alert('Permission to access camera is required!'); return; }
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 1 });
+    if (!result.canceled) setPhoto(result.assets[0].uri);
   };
 
   const handleUpload = () => {
@@ -290,40 +294,91 @@ export default function FormPesticideUsage() {
   };
 
   const resetForm = () => {
-    setTanggal(null);
-    setLokasi('');
-    setHama('');
-    setPestisida('');
-    setBahanAktif('');
-    setPenggunaan1('');
-    setDosisValue('');
-    setDosisUnit('ml');
-    setPenggunaan2('');
-    setSuhu('');
-    setTenagaKerja('');
-    setPhoto(null);
-    setStartTime(null);
-    setEndTime(null);
+    setTanggal(null); setLokasi(''); setHama(''); setPestisida(''); setBahanAktif('');
+    setPenggunaan1(''); setDosisValue(''); setDosisUnit('ml'); setPenggunaan2('');
+    setSuhu(''); setTenagaKerja(''); setPhoto(null); setStartTime(null); setEndTime(null);
     setDropdownOpen(dropdownOpenDefault);
   };
 
-  const handleAdd = () => {
-    if (
-      !tanggal || !lokasi || !hama || !pestisida || !bahanAktif ||
-      !penggunaan1 || !dosisValue || !penggunaan2 ||
-      !suhu || !startTime || !endTime || !tenagaKerja
-    ) {
+  // ----- ALWAYS multipart/form-data -----
+  const postToApi = async (payload) => {
+    const url = `${API_BASE}/hpt/ipm`;
+    const form = new FormData();
+    Object.entries(payload).forEach(([k, v]) => form.append(k, String(v)));
+
+    if (photo) {
+      const filename = photo.split('/').pop() || 'sensor.jpg';
+      const ext = filename.split('.').pop()?.toLowerCase();
+      const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
+      form.append('sensor_pic', { uri: photo, name: filename, type: mime });
+    }
+
+    const headers = await getAuthHeaders(); // DO NOT set Content-Type; fetch will add boundary
+    const res = await fetch(url, { method: 'POST', headers, body: form });
+    const text = await res.text();
+    let json = null; try { json = JSON.parse(text); } catch {}
+
+    return {
+      ok: res.ok,
+      status: res.status,
+      msg: json?.message || json?.error || (Array.isArray(json?.errors) ? json.errors.join(', ') : '') || text || `${res.status}`,
+      data: json ?? text
+    };
+  };
+
+  // ADD: build payload with EXACT fields expected; send as multipart
+  const handleAdd = async () => {
+    if (!tanggal || !lokasi || !hama || !pestisida || !penggunaan1 || !dosisValue || !penggunaan2 || !suhu || !startTime || !endTime || !tenagaKerja) {
       Alert.alert('Form Incomplete', 'Please fill in all required fields (*) before submitting.');
       return;
     }
-    console.log('Form submitted');
+
+    const dateStr = toDateYYYYMMDD(tanggal); // YYYY-MM-DD
+    const startStr = toHHMMSS(startTime);    // HH:mm:ss
+    const endStr   = toHHMMSS(endTime);      // HH:mm:ss
+    const mins = Number(calcMinutes() || 0);
+    const durationHours = Math.max(0, Math.floor(mins / 60)); // integer
+
+    const location_id  = lokasiIdByLabel[lokasi];
+    const pest_id      = hamaIdByLabel[hama];
+    const pesticide_id = pestisidaIdByLabel[pestisida];
+
+    const payload = {
+      date: dateStr,
+      start: startStr,
+      end: endStr,
+      duration: durationHours,
+      treatment: penggunaan1,
+      dosage: parseFloat(dosisValue),
+      unit: dosisUnit,
+      usage: parseFloat(penggunaan2),
+      temperature: parseFloat(suhu),
+      manpower: parseInt(tenagaKerja, 10),
+      ...(location_id != null ? { location_id } : { location_name: lokasi }),
+      ...(pest_id != null ? { pest_id } : { pest_name: hama }),
+      ...(pesticide_id != null ? { pesticide_id } : { pesticide_name: pestisida }),
+      // sensor_pic added in FormData
+    };
+
+    // strip empties / NaN
+    Object.keys(payload).forEach((k) => {
+      const v = payload[k];
+      if (v === '' || v == null || Number.isNaN(v)) delete payload[k];
+    });
+
+    const r = await postToApi(payload);
+    if (r.ok) {
+      Alert.alert('Success', 'Data berhasil disimpan.');
+      resetForm();
+    } else {
+      console.log('POST /hpt/ipm FAILED', r.status, r.msg, payload);
+      Alert.alert('Gagal menyimpan', r.msg);
+    }
   };
 
-  // when user picks a pesticide label, map back to object by name
   const onSelectPestisida = (label) => {
     setPestisida(label);
-    const name = label; // labels are names only now
-    const obj = pestisidaObjects.find((o) => o.name === name) || null; // first match
+    const obj = pestisidaObjects.find((o) => o.name === label) || null;
     setBahanAktif(obj?.active_ingredient || '');
   };
 
@@ -385,7 +440,7 @@ export default function FormPesticideUsage() {
             )}
           </View>
 
-          {/* Pestisida (names only) */}
+          {/* Pestisida */}
           <View style={styles.fieldSpacing}>
             <DropdownInput
               label={<Text>Pestisida <Text style={{ color: '#8B2D2D' }}>*</Text></Text>}
@@ -400,18 +455,18 @@ export default function FormPesticideUsage() {
             )}
           </View>
 
-          {/* Bahan Aktif */}
+          {/* Bahan Aktif (read-only) */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Bahan Aktif <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
+            <Text style={styles.label}>Bahan Aktif</Text>
             <View style={styles.readOnlyBox}>
               <Text style={styles.readOnlyText}>{bahanAktif || ''}</Text>
             </View>
           </View>
 
-          {/* Penggunaan 1 */}
+          {/* Penggunaan / Treatment */}
           <View style={styles.fieldSpacing}>
             <DropdownInput
-              label={<Text>Penggunaan <Text style={{ color: '#8B2D2D' }}>*</Text></Text>}
+              label={<Text>Penggunaan (Treatment) <Text style={{ color: '#8B2D2D' }}>*</Text></Text>}
               value={penggunaan1}
               onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, penggunaan1: !prev.penggunaan1 }))}
             />
@@ -486,9 +541,22 @@ export default function FormPesticideUsage() {
             </View>
           </View>
 
+          {/* Tenaga Kerja */}
+          <View style={styles.fieldSpacing}>
+            <Text style={styles.label}>Tenaga Kerja <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
+            <TextInput
+              style={styles.textInputBox}
+              value={tenagaKerja}
+              onChangeText={(v) => setTenagaKerja(v.replace(/[^\d]/g, ''))}
+              keyboardType="number-pad"
+              placeholder="0"
+              placeholderTextColor="#999"
+            />
+          </View>
+
           {/* Durasi */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Durasi <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
+            <Text style={styles.label}>Durasi</Text>
             <View style={styles.row}>
               <TouchableOpacity style={styles.timeBox} onPress={() => setShowStart(true)}>
                 <View style={styles.timeLabel}><Text>Start</Text><SvgXml xml={clockSvg} width={18} height={18} /></View>
