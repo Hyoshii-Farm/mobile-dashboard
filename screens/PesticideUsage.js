@@ -18,7 +18,7 @@ import CollapsibleMultiselect from '../components/CollapseMulti';
 /** ---------- Config from app.json ---------- */
 const extra = (Constants?.expoConfig?.extra) || (Constants?.manifest?.extra) || {};
 const API_BASE   = extra.EXPO_PUBLIC_API_BASE || 'https://hyoshii-staging.rinal.dev/api/v1';
-const API_BASE2_ = extra.LOCATION_API_BASE || 'https://dashboard-back-dev.vercel.app/api/v1';
+const API_BASE_2_ = extra.LOCATION_API_BASE || 'https://dashboard-back-dev.vercel.app/api/v1';
 const PAGE       = String(extra.EXPO_PUBLIC_PAGE || '1');
 const PAGE_SIZE  = String(extra.EXPO_PUBLIC_PAGE_SIZE || '10');
 
@@ -94,9 +94,13 @@ export default function PesticideUsagePage() {
   const buildUrl = (path) => {
     const p = new URLSearchParams();
     if (PAGE_SIZE) p.set('pageSize', PAGE_SIZE);
-    if (PAGE)      p.set('page', PAGE);
-    return `${API_BASE}${path}?${p.toString()}`;
-  };
+    if (PAGE)      p.set('page', PAGE)
+    if(path==="/location"){
+      return `${API_BASE_2_}${path}?${p.toString()}`;
+    }
+    else {
+      return `${API_BASE}${path}?${p.toString()}`;
+    }}
 
   const fetchOptions = useCallback(async (key) => {
     let lastErr = null;
