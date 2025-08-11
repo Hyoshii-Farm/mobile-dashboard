@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,13 +9,13 @@ import {
   TouchableOpacity,
   TextInput,
   Platform,
-  Image,
   Alert
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SvgXml } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
+import Constants from 'expo-constants';
 
 import StatusBarCustom from '../components/statusbar';
 import Header from '../components/Header';
@@ -23,6 +23,33 @@ import DropdownInput from '../components/DropdownInput';
 import DropdownBox from '../components/DropdownBox';
 import ImageUploadBox from '../components/ImageUploadBox';
 import RoundedButton from '../components/RoundedButton';
+
+/** ---------- Config from app.json ---------- */
+const extra = (Constants?.expoConfig?.extra) || (Constants?.manifest?.extra) || {};
+const API_BASE     = extra.EXPO_PUBLIC_API_BASE || 'https://hyoshii-staging.rinal.dev/api/v1';
+const API_BASE_2_  = extra.LOCATION_API_BASE || 'https://dashboard-back-dev.vercel.app/api/v1';
+const PAGE_SIZE    = Number(extra.EXPO_PUBLIC_PAGE_SIZE || 10);
+const MAX_PAGES    = 200;
+
+const CANDIDATE_ENDPOINTS = {
+  lokasi:    [extra.LOCATION_API_BASE_PATH || '/location'],
+  hama:      [extra.EXPO_PUBLIC_PEST_PATH || '/hama', '/pest', '/pests', '/masterdata/pest'],
+  pestisida: [extra.EXPO_PUBLIC_PESTICIDE_PATH || '/pesticide', '/pesticides', '/masterdata/pesticide'],
+};
+
+const getAuthHeaders = async () => ({
+  Accept: 'application/json',
+  'Content-Type': 'application/json',
+  // Authorization: `Bearer <token>`,
+});
+
+const buildUrl = (path, page = 1, pageSize = PAGE_SIZE) => {
+  const p = new URLSearchParams();
+  if (pageSize) p.set('pageSize', String(pageSize));
+  if (page)     p.set('page', String(page));
+  const base = path === '/location' ? API_BASE_2_ : API_BASE;
+  return `${base}${path}?${p.toString()}`;
+};
 
 const backArrowSvg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="19" height="30" viewBox="0 0 19 30" fill="none">
@@ -45,6 +72,7 @@ const clockSvg = `
 export default function FormPesticideUsage() {
   const navigation = useNavigation();
 
+  // form states
   const [tanggal, setTanggal] = useState(null);
   const [showTanggal, setShowTanggal] = useState(false);
   const [lokasi, setLokasi] = useState('');
@@ -64,42 +92,152 @@ export default function FormPesticideUsage() {
   const [showStart, setShowStart] = useState(false);
   const [showEnd, setShowEnd] = useState(false);
 
-  const dropdownOpenDefault = {
-    lokasi: false,
-    hama: false,
-    pestisida: false,
-    penggunaan1: false,
-    dosisUnit: false,
-  };
-
+  // dropdown open/close
+  const dropdownOpenDefault = { lokasi: false, hama: false, pestisida: false, penggunaan1: false, dosisUnit: false };
   const [dropdownOpen, setDropdownOpen] = useState(dropdownOpenDefault);
 
-  const lokasiOptions = [
-    'Green House 1', 'Green House 2', 'Green House 3', 'Green House 4', 'Green House 5',
-    'Outdoor 1', 'Outdoor 2', 'Outdoor 2 Baru', 'Outdoor 3', 'Outdoor 4',
-    'Outdoor 5', 'Outdoor 6', 'Outdoor 7', 'Nursery 1', 'Nursery 2'
-  ];
+  // options from API
+  const [lokasiOptions, setLokasiOptions] = useState([]);     // strings
+  const [hamaOptions, setHamaOptions] = useState([]);         // strings
 
-  const hamaOptions = [
-    'Antraknosa', 'Aphids', 'Botrytis', 'Erwinia',
-    'Fusarium', 'Jamur Hijau', 'Lalat', 'Lebah',
-    'Mildew Insidensi', 'Mildew Intensitas', 'N. Cucumeris', 'Orius SP',
-    'Powdery Mildew', 'SM', 'Siput', 'Spidermites', 'Thrips', 'Ulat', 'WFT'
-  ];
-
-  const pestisidaOptions = [
-    'Abacel', 'Agrimic', 'Alika', 'Amistar', 'Amistar Top', 'Atoza', 'BP60', 'Bactosin',
-    'Benlox', 'Bion M', 'Biopesticide', 'Buldok', 'Cabrio', 'Cyflumetofen', 'Daconil', 'Decis',
-    'Dense', 'Easy', 'Elestal Neo', 'Endure', 'Explore', 'Flazz', 'Folirfos', 'Furadan', 'Gracia',
-    'Inazeb', 'Lannate', 'Luna Smart', 'Merivon', 'Metarizep', 'Miravis Duo', 'Movento', 'Nordox',
-    'Orondis Opti', 'Orthene', 'P04', 'Pegasus', 'Pemulus', 'Pevicure', 'Regent', 'Revus Optio',
-    'Ridomil Gold', 'Rotraz', 'Rovral', 'SagriFlaz', 'Samite', 'Score', 'Seruni', 'Seudoflor',
-    'Sidametrin', 'Simodis', 'Sivanto', 'Switch', 'Tangker', 'Topsin M', 'Trivia', 'Ziflo'
-  ];
+  // PESTISIDA: keep full objects + labels (names only)
+  const [pestisidaObjects, setPestisidaObjects] = useState([]); // [{id, name, type, active_ingredient}, ...]
+  const [pestisidaLabels, setPestisidaLabels] = useState([]);   // ["Amistar", "Agrimec", ...]
 
   const penggunaanOptions = ['Spray', 'Fogging', 'Kocor'];
 
+  const [loading, setLoading] = useState({ lokasi: false, hama: false, pestisida: false });
+  const [error, setError] = useState(null);
+
   const closeAllDropdowns = () => setDropdownOpen(dropdownOpenDefault);
+
+  const toLabel = (x) => {
+    if (typeof x === 'string') return x;
+    if (!x || typeof x !== 'object') return '';
+    return (
+      x.name ?? x.label ?? x.title ?? x.nama ?? x.nama_lokasi ?? x.location_name ??
+      x.lokasi ?? x.pestisida ?? x.hama ?? ''
+    );
+  };
+
+  const fetchAllPages = useCallback(async (path, pageSize = PAGE_SIZE) => {
+    const headers = await getAuthHeaders();
+    const all = [];
+    let page = 1;
+    let totalPagesKnown = null;
+
+    while (page <= MAX_PAGES) {
+      const url = buildUrl(path, page, pageSize);
+      console.log(`[Form fetch] GET ${url}`);
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        throw new Error(`${res.status} ${res.statusText} ${txt}`.trim());
+      }
+      const data = await res.json();
+
+      let arr =
+        (Array.isArray(data) && data) ||
+        (Array.isArray(data?.items) && data.items) ||
+        (Array.isArray(data?.results) && data.results) ||
+        (Array.isArray(data?.data) && data.data) ||
+        (Array.isArray(data?.rows) && data.rows) ||
+        (Array.isArray(data?.content) && data.content) ||
+        [];
+
+      all.push(...arr);
+
+      const tPages = data?.pagination?.totalPages ?? data?.meta?.totalPages ?? null;
+      if (tPages && !totalPagesKnown) totalPagesKnown = Number(tPages);
+
+      if ((totalPagesKnown && page >= totalPagesKnown) || arr.length === 0 || arr.length < pageSize) {
+        break;
+      }
+      page += 1;
+    }
+    return all;
+  }, []);
+
+  const loadLokasi = useCallback(async () => {
+    setLoading((s) => ({ ...s, lokasi: true })); setError(null);
+    try {
+      const path = CANDIDATE_ENDPOINTS.lokasi[0];
+      const all = await fetchAllPages(path);
+      let labels = all.map(toLabel).filter(Boolean);
+      labels = Array.from(new Set(labels)).sort((a, b) => a.localeCompare(b));
+      setLokasiOptions(labels);
+      console.log(`[Form lokasi] totalRows=${all.length} unique=${labels.length}`);
+    } catch (e) {
+      setError((prev) => (prev ? prev + ' | ' : '') + `Lokasi: ${e?.message || e}`);
+    } finally {
+      setLoading((s) => ({ ...s, lokasi: false }));
+    }
+  }, [fetchAllPages]);
+
+  const loadHama = useCallback(async () => {
+    setLoading((s) => ({ ...s, hama: true })); setError(null);
+    try {
+      for (const path of CANDIDATE_ENDPOINTS.hama) {
+        try {
+          const all = await fetchAllPages(path);
+          let labels = all.map(toLabel).filter(Boolean);
+          labels = Array.from(new Set(labels)).sort((a, b) => a.localeCompare(b));
+          setHamaOptions(labels);
+          console.log(`[Form hama] totalRows=${all.length} unique=${labels.length} from ${path}`);
+          return;
+        } catch (e) {
+          console.warn('[Form hama] fallback path failed', path, e?.message || e);
+        }
+      }
+      throw new Error('No hama endpoint succeeded');
+    } catch (e) {
+      setError((prev) => (prev ? prev + ' | ' : '') + `Hama: ${e?.message || e}`);
+    } finally {
+      setLoading((s) => ({ ...s, hama: false }));
+    }
+  }, [fetchAllPages]);
+
+  const loadPestisida = useCallback(async () => {
+    setLoading((s) => ({ ...s, pestisida: true })); setError(null);
+    try {
+      for (const path of CANDIDATE_ENDPOINTS.pestisida) {
+        try {
+          const all = await fetchAllPages(path);
+          // Keep objects; labels are names only (no IDs)
+          const objs = all.map((x) => ({
+            id: x?.id ?? null,
+            name: (x?.name ?? toLabel(x)) || 'Unknown',
+            type: x?.type ?? '',
+            active_ingredient: x?.active_ingredient ?? x?.activeIngredient ?? '',
+          }));
+
+          // names only
+          const labels = objs.map((o) => o.name).sort((a, b) => a.localeCompare(b));
+
+          // sort objects by name to keep index relationship simple
+          const sortedObjs = [...objs].sort((a, b) => a.name.localeCompare(b.name));
+
+          setPestisidaObjects(sortedObjs);
+          setPestisidaLabels(labels);
+          console.log(`[Form pestisida] rows=${objs.length} labels=${labels.length}`);
+          return;
+        } catch (e) {
+          console.warn('[Form pestisida] fallback path failed', path, e?.message || e);
+        }
+      }
+      throw new Error('No pestisida endpoint succeeded');
+    } catch (e) {
+      setError((prev) => (prev ? prev + ' | ' : '') + `Pestisida: ${e?.message || e}`);
+    } finally {
+      setLoading((s) => ({ ...s, pestisida: false }));
+    }
+  }, [fetchAllPages]);
+
+  useEffect(() => {
+    loadLokasi();
+    loadHama();
+    loadPestisida();
+  }, [loadLokasi, loadHama, loadPestisida]);
 
   const formatTime = (date) => {
     if (!date) return '';
@@ -137,25 +275,18 @@ export default function FormPesticideUsage() {
       alert('Permission to access camera is required!');
       return;
     }
-    let result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      quality: 1,
-    });
+    let result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 1 });
     if (!result.canceled) {
       setPhoto(result.assets[0].uri);
     }
   };
 
   const handleUpload = () => {
-    Alert.alert(
-      'Upload Gambar',
-      'Pilih sumber gambar',
-      [
-        { text: 'Ambil Foto', onPress: takePhoto },
-        { text: 'Pilih dari Galeri', onPress: pickImage },
-        { text: 'Batal', style: 'cancel' }
-      ]
-    );
+    Alert.alert('Upload Gambar', 'Pilih sumber gambar', [
+      { text: 'Ambil Foto', onPress: takePhoto },
+      { text: 'Pilih dari Galeri', onPress: pickImage },
+      { text: 'Batal', style: 'cancel' },
+    ]);
   };
 
   const resetForm = () => {
@@ -178,23 +309,22 @@ export default function FormPesticideUsage() {
 
   const handleAdd = () => {
     if (
-      !tanggal ||
-      !lokasi ||
-      !hama ||
-      !pestisida ||
-      !bahanAktif ||
-      !penggunaan1 ||
-      !dosisValue ||
-      !penggunaan2 ||
-      !suhu ||
-      !startTime ||
-      !endTime ||
-      !tenagaKerja
+      !tanggal || !lokasi || !hama || !pestisida || !bahanAktif ||
+      !penggunaan1 || !dosisValue || !penggunaan2 ||
+      !suhu || !startTime || !endTime || !tenagaKerja
     ) {
       Alert.alert('Form Incomplete', 'Please fill in all required fields (*) before submitting.');
       return;
     }
     console.log('Form submitted');
+  };
+
+  // when user picks a pesticide label, map back to object by name
+  const onSelectPestisida = (label) => {
+    setPestisida(label);
+    const name = label; // labels are names only now
+    const obj = pestisidaObjects.find((o) => o.name === name) || null; // first match
+    setBahanAktif(obj?.active_ingredient || '');
   };
 
   return (
@@ -206,11 +336,11 @@ export default function FormPesticideUsage() {
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
           <Text style={styles.formTitle}>Form Pengendalian Hama</Text>
 
+          {!!error && <Text style={{ color: '#8B2D2D', marginBottom: 8 }}>⚠️ {error}</Text>}
+
           {/* Tanggal */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>
-              Tanggal <Text style={{ color: '#8B2D2D' }}>*</Text>
-            </Text>
+            <Text style={styles.label}>Tanggal <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
             <TouchableOpacity style={styles.dateBox} onPress={() => setShowTanggal(true)}>
               <Text style={styles.dateText}>{tanggal ? tanggal.toLocaleDateString() : ''}</Text>
               <SvgXml xml={calendarSvg} width={20} height={20} />
@@ -220,10 +350,7 @@ export default function FormPesticideUsage() {
                 value={tanggal || new Date()}
                 mode="date"
                 display="default"
-                onChange={(event, selectedDate) => {
-                  setShowTanggal(false);
-                  if (selectedDate) setTanggal(selectedDate);
-                }}
+                onChange={(event, selectedDate) => { setShowTanggal(false); if (selectedDate) setTanggal(selectedDate); }}
               />
             )}
           </View>
@@ -235,7 +362,12 @@ export default function FormPesticideUsage() {
               value={lokasi}
               onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, lokasi: !prev.lokasi }))}
             />
-            {dropdownOpen.lokasi && <DropdownBox items={lokasiOptions} onSelect={(option) => { setLokasi(option); closeAllDropdowns(); }} />}
+            {dropdownOpen.lokasi && (
+              <DropdownBox
+                items={lokasiOptions}
+                onSelect={(option) => { setLokasi(option); closeAllDropdowns(); }}
+              />
+            )}
           </View>
 
           {/* Hama */}
@@ -245,24 +377,32 @@ export default function FormPesticideUsage() {
               value={hama}
               onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, hama: !prev.hama }))}
             />
-            {dropdownOpen.hama && <DropdownBox items={hamaOptions} onSelect={(option) => { setHama(option); closeAllDropdowns(); }} />}
+            {dropdownOpen.hama && (
+              <DropdownBox
+                items={hamaOptions}
+                onSelect={(option) => { setHama(option); closeAllDropdowns(); }}
+              />
+            )}
           </View>
 
-          {/* Pestisida */}
+          {/* Pestisida (names only) */}
           <View style={styles.fieldSpacing}>
             <DropdownInput
               label={<Text>Pestisida <Text style={{ color: '#8B2D2D' }}>*</Text></Text>}
               value={pestisida}
               onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, pestisida: !prev.pestisida }))}
             />
-            {dropdownOpen.pestisida && <DropdownBox items={pestisidaOptions} onSelect={(option) => { setPestisida(option); setBahanAktif(option); closeAllDropdowns(); }} />}
+            {dropdownOpen.pestisida && (
+              <DropdownBox
+                items={pestisidaLabels}
+                onSelect={(option) => { onSelectPestisida(option); closeAllDropdowns(); }}
+              />
+            )}
           </View>
 
           {/* Bahan Aktif */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>
-              Bahan Aktif <Text style={{ color: '#8B2D2D' }}>*</Text>
-            </Text>
+            <Text style={styles.label}>Bahan Aktif <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
             <View style={styles.readOnlyBox}>
               <Text style={styles.readOnlyText}>{bahanAktif || ''}</Text>
             </View>
@@ -275,42 +415,70 @@ export default function FormPesticideUsage() {
               value={penggunaan1}
               onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, penggunaan1: !prev.penggunaan1 }))}
             />
-            {dropdownOpen.penggunaan1 && <DropdownBox items={penggunaanOptions} onSelect={(option) => { setPenggunaan1(option); closeAllDropdowns(); }} />}
+            {dropdownOpen.penggunaan1 && (
+              <DropdownBox
+                items={penggunaanOptions}
+                onSelect={(option) => { setPenggunaan1(option); closeAllDropdowns(); }}
+              />
+            )}
           </View>
 
           {/* Dosis */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>
-              Dosis (per Liter) <Text style={{ color: '#8B2D2D' }}>*</Text>
-            </Text>
+            <Text style={styles.label}>Dosis (per Liter) <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
             <View style={styles.unitBox}>
               <View style={styles.unitInputArea}>
-                <TextInput style={styles.inputText} value={dosisValue} onChangeText={(val) => setDosisValue(val.replace(/[^0-9.]/g, ''))} keyboardType="numeric" placeholder="0" placeholderTextColor="#999" />
+                <TextInput
+                  style={styles.inputText}
+                  value={dosisValue}
+                  onChangeText={(val) => setDosisValue(val.replace(/[^0-9.]/g, ''))}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#999"
+                />
               </View>
-              <TouchableOpacity style={styles.unitLabel} onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, dosisUnit: !prev.dosisUnit }))}>
+              <TouchableOpacity
+                style={styles.unitLabel}
+                onPress={() => setDropdownOpen(prev => ({ ...dropdownOpenDefault, dosisUnit: !prev.dosisUnit }))}
+              >
                 <Text style={styles.unitLabelText}>{dosisUnit}</Text>
                 <SvgXml xml={`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`} />
               </TouchableOpacity>
             </View>
-            {dropdownOpen.dosisUnit && <DropdownBox items={['ml', 'gr']} onSelect={(option) => { setDosisUnit(option); closeAllDropdowns(); }} />}
+            {dropdownOpen.dosisUnit && (
+              <DropdownBox
+                items={['ml', 'gr']}
+                onSelect={(option) => { setDosisUnit(option); closeAllDropdowns(); }}
+              />
+            )}
           </View>
 
           {/* Jumlah Penggunaan */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>
-              Jumlah Penggunaan <Text style={{ color: '#8B2D2D' }}>*</Text>
-            </Text>
-            <TextInput style={styles.textInputBox} value={penggunaan2} onChangeText={(val) => setPenggunaan2(val.replace(/[^0-9.]/g, ''))} keyboardType="numeric" placeholder="0" placeholderTextColor="#999" />
+            <Text style={styles.label}>Jumlah Penggunaan <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
+            <TextInput
+              style={styles.textInputBox}
+              value={penggunaan2}
+              onChangeText={(val) => setPenggunaan2(val.replace(/[^0-9.]/g, ''))}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor="#999"
+            />
           </View>
 
           {/* Suhu */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>
-              Suhu <Text style={{ color: '#8B2D2D' }}>*</Text>
-            </Text>
+            <Text style={styles.label}>Suhu <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
             <View style={styles.unitBox}>
               <View style={styles.unitInputArea}>
-                <TextInput style={styles.inputText} value={suhu} onChangeText={(val) => setSuhu(val.replace(/[^0-9.]/g, ''))} keyboardType="numeric" placeholder="0" placeholderTextColor="#999" />
+                <TextInput
+                  style={styles.inputText}
+                  value={suhu}
+                  onChangeText={(val) => setSuhu(val.replace(/[^0-9.]/g, ''))}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#999"
+                />
               </View>
               <View style={styles.unitLabel}>
                 <Text style={styles.unitLabelText}>°C</Text>
@@ -320,9 +488,7 @@ export default function FormPesticideUsage() {
 
           {/* Durasi */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>
-              Durasi <Text style={{ color: '#8B2D2D' }}>*</Text>
-            </Text>
+            <Text style={styles.label}>Durasi <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
             <View style={styles.row}>
               <TouchableOpacity style={styles.timeBox} onPress={() => setShowStart(true)}>
                 <View style={styles.timeLabel}><Text>Start</Text><SvgXml xml={clockSvg} width={18} height={18} /></View>
@@ -361,48 +527,13 @@ export default function FormPesticideUsage() {
             </View>
           </View>
 
-          {/* Tenaga Kerja */}
-          <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>
-              Tenaga Kerja <Text style={{ color: '#8B2D2D' }}>*</Text>
-            </Text>
-            <View style={styles.unitBox}>
-              <View style={styles.unitInputArea}>
-                <TextInput
-                  style={styles.inputText}
-                  value={tenagaKerja}
-                  onChangeText={(val) => setTenagaKerja(val.replace(/[^0-9]/g, ''))}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor="#999"
-                />
-              </View>
-              <View style={styles.unitLabel}>
-                <Text style={styles.unitLabelText}>Orang</Text>
-              </View>
-            </View>
-          </View>
-
           {/* Gambar */}
-          <ImageUploadBox
-            label="Gambar"
-            photo={photo}
-            onUpload={handleUpload}
-            onRemove={() => setPhoto(null)}
-          />
+          <ImageUploadBox label="Gambar" photo={photo} onUpload={handleUpload} onRemove={() => setPhoto(null)} />
 
           {/* Buttons */}
           <View style={styles.buttonRow}>
-            <RoundedButton
-              label="ADD"
-              backgroundColor="#1D4949"
-              onPress={handleAdd}
-            />
-            <RoundedButton
-              label="RESET"
-              backgroundColor="#8B2D2D"
-              onPress={resetForm}
-            />
+            <RoundedButton label="ADD" backgroundColor="#1D4949" onPress={handleAdd} />
+            <RoundedButton label="RESET" backgroundColor="#8B2D2D" onPress={resetForm} />
           </View>
         </ScrollView>
       </View>
@@ -416,80 +547,36 @@ const styles = StyleSheet.create({
   formTitle: { fontSize: 16, fontWeight: '700', color: '#8B0000', marginBottom: 12 },
   label: { fontSize: 14, fontWeight: '600', color: '#000', marginBottom: 4 },
   dateBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: '#FFF9F2',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderColor: '#000', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#FFF9F2',
   },
   dateText: { color: '#333', fontSize: 14 },
   fieldSpacing: { marginBottom: 16 },
   readOnlyBox: {
-    borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    height: 48,
-    backgroundColor: '#FFF9F2',
-    justifyContent: 'center',
+    borderWidth: 1, borderColor: '#000', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 12,
+    height: 48, backgroundColor: '#FFF9F2', justifyContent: 'center',
   },
   readOnlyText: { fontSize: 14, color: '#333' },
   textInputBox: {
-    borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 12,
-    height: 48,
-    paddingHorizontal: 12,
-    backgroundColor: '#FFF9F2',
-    fontSize: 14,
-    color: '#333',
+    borderWidth: 1, borderColor: '#000', borderRadius: 12, height: 48, paddingHorizontal: 12, backgroundColor: '#FFF9F2',
+    fontSize: 14, color: '#333',
   },
   unitBox: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 12,
-    backgroundColor: '#FFF9F2',
-    overflow: 'hidden',
-    height: 48,
-    marginTop: 8,
+    flexDirection: 'row', borderWidth: 1, borderColor: '#000', borderRadius: 12,
+    backgroundColor: '#FFF9F2', overflow: 'hidden', height: 48, marginTop: 8,
   },
   unitInputArea: { flex: 1, paddingHorizontal: 12, justifyContent: 'center' },
   unitLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 12,
-    paddingRight: 8,
-    borderLeftWidth: 1,
-    borderLeftColor: '#000',
-    height: '100%',
-    minWidth: 55,
+    flexDirection: 'row', alignItems: 'center', paddingLeft: 12, paddingRight: 8,
+    borderLeftWidth: 1, borderLeftColor: '#000', height: '100%', minWidth: 55,
   },
   unitLabelText: { fontSize: 14, fontWeight: '500', color: '#333', marginRight: 4 },
   inputText: { fontSize: 14, color: '#333', paddingVertical: 0 },
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
   timeBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 48,
-    backgroundColor: '#FFF9F2',
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderColor: '#000', borderRadius: 12, paddingHorizontal: 12, height: 48, backgroundColor: '#FFF9F2',
   },
   timeLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  previewImage: { width: '100%', height: 200, borderRadius: 12, marginBottom: 10 },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
+  buttonRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
 });
