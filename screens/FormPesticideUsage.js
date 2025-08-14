@@ -259,7 +259,9 @@ export default function FormPesticideUsage() {
 
   // ---------- formatters
   const pad2 = (n) => String(n).padStart(2,'0');
-  const toDateYYYYMMDD = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const toDateYYYYMMDD = (d) => {
+  return d ? d.toISOString().split('T')[0] : '';  // Ensures "YYYY-MM-DD" format
+};
   const toHHMMSS = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}:00`;
   const formatTime = (d) => (d ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : '');
 
@@ -326,55 +328,55 @@ export default function FormPesticideUsage() {
     };
   };
 
-  // ADD: build payload with EXACT fields expected; send as multipart
-  const handleAdd = async () => {
-    if (!tanggal || !lokasi || !hama || !pestisida || !penggunaan1 || !dosisValue || !penggunaan2 || !suhu || !startTime || !endTime || !tenagaKerja) {
-      Alert.alert('Form Incomplete', 'Please fill in all required fields (*) before submitting.');
-      return;
-    }
+const handleAdd = async () => {
+  if (!tanggal || !lokasi || !hama || !pestisida || !penggunaan1 || !dosisValue || !penggunaan2 || !suhu || !startTime || !endTime || !tenagaKerja) {
+    Alert.alert('Form Incomplete', 'Please fill in all required fields (*) before submitting.');
+    return;
+  }
 
-    const dateStr = toDateYYYYMMDD(tanggal); // YYYY-MM-DD
-    const startStr = toHHMMSS(startTime);    // HH:mm:ss
-    const endStr   = toHHMMSS(endTime);      // HH:mm:ss
-    const mins = Number(calcMinutes() || 0);
-    const durationHours = Math.max(0, Math.floor(mins / 60)); // integer
+ 
+  const dateStr = toDateYYYYMMDD(tanggal);  
+  console.log('Formatted Date:', dateStr); 
 
-    const location_id  = lokasiIdByLabel[lokasi];
-    const pest_id      = hamaIdByLabel[hama];
-    const pesticide_id = pestisidaIdByLabel[pestisida];
+  // Time formatting
+  const startStr = toHHMMSS(startTime);    
+  const endStr   = toHHMMSS(endTime);      
 
-    const payload = {
-      date: dateStr,
-      start: startStr,
-      end: endStr,
-      duration: durationHours,
-      treatment: penggunaan1,
-      dosage: parseFloat(dosisValue),
-      unit: dosisUnit,
-      usage: parseFloat(penggunaan2),
-      temperature: parseFloat(suhu),
-      manpower: parseInt(tenagaKerja, 10),
-      ...(location_id != null ? { location_id } : { location_name: lokasi }),
-      ...(pest_id != null ? { pest_id } : { pest_name: hama }),
-      ...(pesticide_id != null ? { pesticide_id } : { pesticide_name: pestisida }),
-      // sensor_pic added in FormData
-    };
+  const mins = Number(calcMinutes() || 0);
+  const durationHours = Math.max(0, Math.floor(mins / 60)); a
 
-    // strip empties / NaN
-    Object.keys(payload).forEach((k) => {
-      const v = payload[k];
-      if (v === '' || v == null || Number.isNaN(v)) delete payload[k];
-    });
+  const location_id  = lokasiIdByLabel[lokasi];
+  const pest_id      = hamaIdByLabel[hama];
+  const pesticide_id = pestisidaIdByLabel[pestisida];
 
-    const r = await postToApi(payload);
-    if (r.ok) {
-      Alert.alert('Success', 'Data berhasil disimpan.');
-      resetForm();
-    } else {
-      console.log('POST /hpt/ipm FAILED', r.status, r.msg, payload);
-      Alert.alert('Gagal menyimpan', r.msg);
-    }
-  };
+  const payload = {
+  datetime: new Date(tanggal).toISOString(),  // Full datetime in ISO format
+  start: startStr,
+  end: endStr,
+  duration: durationHours,
+  treatment: penggunaan1,
+  dosage: parseFloat(dosisValue),
+  unit: dosisUnit,
+  usage: parseFloat(penggunaan2),
+  temperature: parseFloat(suhu),
+  manpower: parseInt(tenagaKerja, 10),
+  ...(location_id != null ? { location_id } : { location_name: lokasi }),
+  ...(pest_id != null ? { pest_id } : { pest_name: hama }),
+  ...(pesticide_id != null ? { pesticide_id } : { pesticide_name: pestisida }),
+};
+
+  console.log("Payload to send:", payload); // Log the payload before sending
+
+  const r = await postToApi(payload);
+  if (r.ok) {
+    Alert.alert('Success', 'Data successfully saved.');
+    resetForm(); // Reset form if successful
+  } else {
+    console.log('POST /hpt/ipm FAILED', r.status, r.msg, payload);
+    Alert.alert('Failed to save', r.msg);
+  }
+};
+
 
   const onSelectPestisida = (label) => {
     setPestisida(label);
@@ -397,7 +399,7 @@ export default function FormPesticideUsage() {
           <View style={styles.fieldSpacing}>
             <Text style={styles.label}>Tanggal <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
             <TouchableOpacity style={styles.dateBox} onPress={() => setShowTanggal(true)}>
-              <Text style={styles.dateText}>{tanggal ? tanggal.toLocaleDateString() : ''}</Text>
+              <Text style={styles.dateText}>{tanggal ? toDateYYYYMMDD(tanggal) : ''}</Text>
               <SvgXml xml={calendarSvg} width={20} height={20} />
             </TouchableOpacity>
             {showTanggal && (
