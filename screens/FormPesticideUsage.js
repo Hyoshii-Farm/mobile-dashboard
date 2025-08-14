@@ -15,7 +15,10 @@ import { useNavigation } from '@react-navigation/native';
 import { SvgXml } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import Constants from 'expo-constants';
+import * as ImageManipulator from 'expo-image-manipulator';
+
 
 import StatusBarCustom from '../components/statusbar';
 import Header from '../components/Header';
@@ -26,14 +29,14 @@ import RoundedButton from '../components/RoundedButton';
 
 /** ---------- Config from app.json ---------- */
 const extra = (Constants?.expoConfig?.extra) || (Constants?.manifest?.extra) || {};
-const API_BASE     = extra.EXPO_PUBLIC_API_BASE || 'https://hyoshii-staging.rinal.dev/api/v1';
-const API_BASE_2_  = extra.LOCATION_API_BASE || 'https://dashboard-back-dev.vercel.app/api/v1';
-const PAGE_SIZE    = Number(extra.EXPO_PUBLIC_PAGE_SIZE || 10);
-const MAX_PAGES    = 200;
+const API_BASE = extra.EXPO_PUBLIC_API_BASE || 'https://hyoshii-staging.rinal.dev/api/v1';
+const API_BASE_2_ = extra.LOCATION_API_BASE || 'https://dashboard-back-dev.vercel.app/api/v1';
+const PAGE_SIZE = Number(extra.EXPO_PUBLIC_PAGE_SIZE || 10);
+const MAX_PAGES = 200;
 
 const CANDIDATE_ENDPOINTS = {
-  lokasi:    [extra.LOCATION_API_BASE_PATH || '/location'],
-  hama:      [extra.EXPO_PUBLIC_PEST_PATH || '/hama', '/pest', '/pests', '/masterdata/pest'],
+  lokasi: [extra.LOCATION_API_BASE_PATH || '/location'],
+  hama: [extra.EXPO_PUBLIC_PEST_PATH || '/hama', '/pest', '/pests', '/masterdata/pest'],
   pestisida: [extra.EXPO_PUBLIC_PESTICIDE_PATH || '/pesticide', '/pesticides', '/masterdata/pesticide'],
 };
 
@@ -45,7 +48,7 @@ const getAuthHeaders = async () => ({
 const buildUrl = (path, page = 1, pageSize = PAGE_SIZE) => {
   const p = new URLSearchParams();
   if (pageSize) p.set('pageSize', String(pageSize));
-  if (page)     p.set('page', String(page));
+  if (page) p.set('page', String(page));
   const base = path === '/location' ? API_BASE_2_ : API_BASE;
   return `${base}${path}?${p.toString()}`;
 };
@@ -84,7 +87,10 @@ export default function FormPesticideUsage() {
   const [penggunaan2, setPenggunaan2] = useState('');
   const [suhu, setSuhu] = useState('');
   const [tenagaKerja, setTenagaKerja] = useState('');
+  const [pic, setPic] = useState('');  // pic: name of the person performing the treatment (grower's names)
+  const [description, setDescription] = useState(''); // description field for optional input
   const [photo, setPhoto] = useState(null);
+  const [base64Image, setBase64Image] = useState('');
 
   const [startTime, setStartTime] = useState(null);
   const [endTime, setEndTime] = useState(null);
@@ -260,9 +266,9 @@ export default function FormPesticideUsage() {
   // ---------- formatters
   const pad2 = (n) => String(n).padStart(2,'0');
   const toDateYYYYMMDD = (d) => {
-  return d ? d.toISOString().split('T')[0] : '';  // Ensures "YYYY-MM-DD" format
-};
-  const toHHMMSS = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}:00`;
+    return d ? d.toISOString().split('T')[0] : '';  // Ensures "YYYY-MM-DD" format
+  };
+  const toHHMM = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;  // Ensure HH:MM format
   const formatTime = (d) => (d ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : '');
 
   const calcMinutes = () => {
@@ -277,14 +283,24 @@ export default function FormPesticideUsage() {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) { alert('Permission to access gallery is required!'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 1 });
-    if (!result.canceled) setPhoto(result.assets[0].uri);
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      const base64Image = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      setPhoto(uri);  // Store the image URI
+      setBase64Image(base64Image); // Store the base64 image string
+    }
   };
 
   const takePhoto = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (!permissionResult.granted) { alert('Permission to access camera is required!'); return; }
     const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 1 });
-    if (!result.canceled) setPhoto(result.assets[0].uri);
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      const base64Image = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      setPhoto(uri);  // Store the image URI
+      setBase64Image(base64Image); // Store the base64 image string
+    }
   };
 
   const handleUpload = () => {
@@ -298,83 +314,118 @@ export default function FormPesticideUsage() {
   const resetForm = () => {
     setTanggal(null); setLokasi(''); setHama(''); setPestisida(''); setBahanAktif('');
     setPenggunaan1(''); setDosisValue(''); setDosisUnit('ml'); setPenggunaan2('');
-    setSuhu(''); setTenagaKerja(''); setPhoto(null); setStartTime(null); setEndTime(null);
+    setSuhu(''); setTenagaKerja(''); setPic(''); setDescription(''); setPhoto(null); setStartTime(null); setEndTime(null);
     setDropdownOpen(dropdownOpenDefault);
   };
 
   // ----- ALWAYS multipart/form-data -----
-  const postToApi = async (payload) => {
-    const url = `${API_BASE}/hpt/ipm`;
-    const form = new FormData();
-    Object.entries(payload).forEach(([k, v]) => form.append(k, String(v)));
+const postToApi = async (payload) => {
+  const url = `${API_BASE}/hpt/ipm`;
+  const headers = await getAuthHeaders();
+  headers['Content-Type'] = 'application/json';
 
-    if (photo) {
-      const filename = photo.split('/').pop() || 'sensor.jpg';
-      const ext = filename.split('.').pop()?.toLowerCase();
-      const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
-      form.append('sensor_pic', { uri: photo, name: filename, type: mime });
-    }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  });
 
-    const headers = await getAuthHeaders(); // DO NOT set Content-Type; fetch will add boundary
-    const res = await fetch(url, { method: 'POST', headers, body: form });
-    const text = await res.text();
-    let json = null; try { json = JSON.parse(text); } catch {}
+  const text = await res.text();
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch {}
 
-    return {
-      ok: res.ok,
-      status: res.status,
-      msg: json?.message || json?.error || (Array.isArray(json?.errors) ? json.errors.join(', ') : '') || text || `${res.status}`,
-      data: json ?? text
-    };
+  return {
+    ok: res.ok,
+    status: res.status,
+    msg: json?.message || json?.error || text,
+    data: json ?? text,
   };
-
-const handleAdd = async () => {
-  if (!tanggal || !lokasi || !hama || !pestisida || !penggunaan1 || !dosisValue || !penggunaan2 || !suhu || !startTime || !endTime || !tenagaKerja) {
-    Alert.alert('Form Incomplete', 'Please fill in all required fields (*) before submitting.');
-    return;
-  }
-
- 
-  const dateStr = toDateYYYYMMDD(tanggal);  
-  console.log('Formatted Date:', dateStr); 
-
-  // Time formatting
-  const startStr = toHHMMSS(startTime);    
-  const endStr   = toHHMMSS(endTime);      
-
-  const mins = Number(calcMinutes() || 0);
-  const durationHours = Math.max(0, Math.floor(mins / 60)); a
-
-  const location_id  = lokasiIdByLabel[lokasi];
-  const pest_id      = hamaIdByLabel[hama];
-  const pesticide_id = pestisidaIdByLabel[pestisida];
-
-  const payload = {
-  datetime: new Date(tanggal).toISOString(),  // Full datetime in ISO format
-  start: startStr,
-  end: endStr,
-  duration: durationHours,
-  treatment: penggunaan1,
-  dosage: parseFloat(dosisValue),
-  unit: dosisUnit,
-  usage: parseFloat(penggunaan2),
-  temperature: parseFloat(suhu),
-  manpower: parseInt(tenagaKerja, 10),
-  ...(location_id != null ? { location_id } : { location_name: lokasi }),
-  ...(pest_id != null ? { pest_id } : { pest_name: hama }),
-  ...(pesticide_id != null ? { pesticide_id } : { pesticide_name: pestisida }),
 };
 
-  console.log("Payload to send:", payload); // Log the payload before sending
 
-  const r = await postToApi(payload);
-  if (r.ok) {
-    Alert.alert('Success', 'Data successfully saved.');
-    resetForm(); // Reset form if successful
-  } else {
-    console.log('POST /hpt/ipm FAILED', r.status, r.msg, payload);
-    Alert.alert('Failed to save', r.msg);
-  }
+const uploadToCloudinary = async (uri) => {
+const compressed = await ImageManipulator.manipulateAsync(
+uri,
+[{ resize: { width: 1280 } }],
+{ compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+);
+
+const fileName = compressed.uri.split('/').pop();
+const formData = new FormData();
+formData.append('file', {
+uri: compressed.uri,
+name: fileName,
+type: 'image/jpeg',
+});
+formData.append('upload_preset', 'ml_default');
+formData.append('cloud_name', 'dsja6uts0');
+
+const res = await fetch('https://api.cloudinary.com/v1_1/dsja6uts0/image/upload', {
+method: 'POST',
+body: formData,
+});
+
+const data = await res.json();
+if (data.secure_url) return data.secure_url;
+else throw new Error('Upload failed: ' + JSON.stringify(data));
+};
+
+const handleAdd = async () => {
+if (!tanggal || !lokasi || !hama || !pestisida || !penggunaan1 || !dosisValue || !penggunaan2 || !suhu || !startTime || !endTime || !tenagaKerja || !pic) {
+Alert.alert('Form Incomplete', 'Please fill in all required fields (*) before submitting.');
+return;
+}
+
+const payload = {
+datetime: toDateYYYYMMDD(tanggal),
+start: toHHMM(startTime),
+end: toHHMM(endTime),
+duration: Math.floor((endTime - startTime) / 60000),
+treatment: penggunaan1,
+dosage: parseFloat(dosisValue),
+unit: dosisUnit,
+usage: parseFloat(penggunaan2),
+temperature: parseFloat(suhu),
+manpower: parseInt(tenagaKerja, 10),
+...(lokasiIdByLabel[lokasi] ? { location_id: lokasiIdByLabel[lokasi] } : { location_name: lokasi }),
+...(hamaIdByLabel[hama] ? { pest_id: hamaIdByLabel[hama] } : { pest_name: hama }),
+...(pestisidaIdByLabel[pestisida] ? { pesticide_id: pestisidaIdByLabel[pestisida] } : { pesticide_name: pestisida }),
+pic,
+description,
+};
+
+if (photo) {
+try {
+const imageUrl = await uploadToCloudinary(photo);
+payload.picture = imageUrl;
+} catch (e) {
+Alert.alert('Upload Failed', 'Gagal mengunggah gambar ke Cloudinary.');
+return;
+}
+}
+
+const res = await postToApi(payload);
+if (res.ok) {
+Alert.alert(
+'Success',
+'Data berhasil disimpan.',
+[
+{
+text: 'OK',
+onPress: () => {
+resetForm();
+navigation.navigate('PesticideUsage');
+}
+}
+],
+{ cancelable: false }
+);
+} else {
+Alert.alert('Gagal menyimpan', res.msg);
+console.log('API Error:', res);
+}
 };
 
 
@@ -556,9 +607,21 @@ const handleAdd = async () => {
             />
           </View>
 
+          {/* Grower's Name (pic) */}
+          <View style={styles.fieldSpacing}>
+            <Text style={styles.label}>Grower's Name</Text>
+            <TextInput
+              style={styles.textInputBox}
+              value={pic}
+              onChangeText={setPic}
+              placeholder="Enter grower's name(s)"
+              placeholderTextColor="#999"
+            />
+          </View>
+
           {/* Durasi */}
           <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Durasi</Text>
+            <Text style={styles.label}>Durasi <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
             <View style={styles.row}>
               <TouchableOpacity style={styles.timeBox} onPress={() => setShowStart(true)}>
                 <View style={styles.timeLabel}><Text>Start</Text><SvgXml xml={clockSvg} width={18} height={18} /></View>
@@ -599,6 +662,19 @@ const handleAdd = async () => {
 
           {/* Gambar */}
           <ImageUploadBox label="Gambar" photo={photo} onUpload={handleUpload} onRemove={() => setPhoto(null)} />
+
+          {/* Description */}
+          <View style={styles.fieldSpacing}>
+            <Text style={styles.label}>Description</Text>
+            <TextInput
+              style={styles.textInputBox}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Enter description (optional)"
+              placeholderTextColor="#999"
+            />
+          </View>
+
 
           {/* Buttons */}
           <View style={styles.buttonRow}>
