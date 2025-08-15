@@ -23,18 +23,15 @@ const API_BASE_2_  = extra.LOCATION_API_BASE || 'https://dashboard-back-dev.verc
 const PAGE_SIZE    = Number(extra.EXPO_PUBLIC_PAGE_SIZE || 10);
 const MAX_PAGES    = 200;
 
-/** Prefer exact paths from config; keep sensible fallbacks just in case */
 const CANDIDATE_ENDPOINTS = {
   lokasi:    [extra.LOCATION_API_BASE_PATH || '/location'],
   hama:      [extra.EXPO_PUBLIC_PEST_PATH || '/hama', '/pest', '/pests', '/masterdata/pest'],
   pestisida: [extra.EXPO_PUBLIC_PESTICIDE_PATH || '/pesticide', '/pesticides', '/masterdata/pesticide'],
 };
 
-// Add Authorization etc. here if your Postman request has them
 const getAuthHeaders = async () => ({
   Accept: 'application/json',
   'Content-Type': 'application/json',
-  // Authorization: `Bearer <token>`,
 });
 
 const backArrowSvg = `
@@ -52,6 +49,8 @@ const calendarSvg = `
 export default function PesticideUsagePage() {
   const navigation = useNavigation();
 
+  const [showFilters, setShowFilters] = useState(false);
+
   const [selectedLocation, setSelectedLocation]   = useState('');
   const [selectedPest, setSelectedPest]           = useState('');
   const [selectedPesticide, setSelectedPesticide] = useState('');
@@ -68,10 +67,9 @@ export default function PesticideUsagePage() {
 
   const [dropdownOpen, setDropdownOpen] = useState({ lokasi: false, hama: false, pestisida: false });
 
-  // API-driven options
   const [lokasiOptions, setLokasiOptions]       = useState([]);
   const [hamaOptions, setHamaOptions]           = useState([]);
-  const [pestisidaOptions, setPestisidaOptions] = useState([]); // keep ALL rows
+  const [pestisidaOptions, setPestisidaOptions] = useState([]);
 
   const [loading, setLoading] = useState({ lokasi: false, hama: false, pestisida: false });
   const [error, setError]     = useState(null);
@@ -147,26 +145,18 @@ export default function PesticideUsagePage() {
         const all = await fetchAllPages(path, PAGE_SIZE);
 
         if (key === 'pestisida') {
-          // Normalize names and KEEP ALL rows (no filtering, no dedupe)
-          const labels = all.map((x) => {
-            const name = (x?.name ?? toLabel(x)) || 'Unknown';
-            return String(name);
-          }).sort((a, b) => a.localeCompare(b));
-
+          const labels = all.map((x) => (x?.name ?? toLabel(x)) || 'Unknown')
+                            .sort((a, b) => a.localeCompare(b));
           setPestisidaOptions(labels);
-          console.log(`[pestisida] rows=${all.length} labels=${labels.length} (normalized, no dedupe)`);
+          console.log(`[pestisida] rows=${all.length} labels=${labels.length}`);
         } else {
-          // lokasi / hama: unique list
           let labels = all.map(toLabel).filter((s) => typeof s === 'string' && s.trim().length > 0);
           if (labels.length === 0 && all.length > 0) {
             labels = all.map((x) => { try { return JSON.stringify(x); } catch { return String(x); } });
           }
           const uniqueSorted = Array.from(new Set(labels)).sort((a, b) => a.localeCompare(b));
-
           if (key === 'lokasi') setLokasiOptions(uniqueSorted);
           if (key === 'hama')   setHamaOptions(uniqueSorted);
-
-          console.log(`[${key}] rows=${all.length} unique=${uniqueSorted.length}`);
         }
 
         return;
@@ -218,115 +208,102 @@ export default function PesticideUsagePage() {
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
           <AddNewButton onPress={() => navigation.navigate('FormPesticideUsage')} />
 
-          <View style={styles.formSection}>
-            <DropdownInput
-              label={`Lokasi${lokasiOptions.length ? ` (${lokasiOptions.length})` : ''}`}
-              value={selectedLocation}
-              onPress={() =>
-                lokasiOptions.length &&
-                setDropdownOpen((p) => ({ lokasi: !p.lokasi, hama: false, pestisida: false }))
-              }
-            />
-            {dropdownOpen.lokasi && (
-              <DropdownBox
-                items={lokasiOptions}
-                onSelect={(option) => { setSelectedLocation(option); closeAllDropdowns(); }}
-              />
-            )}
+          <TouchableOpacity
+            style={[styles.filterButton, { marginTop: 12 }]}
+            onPress={() => setShowFilters(!showFilters)}
+          >
+          <Text style={styles.filterButtonText}>{showFilters ? 'Hide Filters' : 'Show Filters'}</Text>
+          </TouchableOpacity>
 
-            <DropdownInput
-              label={`Hama${hamaOptions.length ? ` (${hamaOptions.length})` : ''}`}
-              value={selectedPest}
-              onPress={() =>
-                hamaOptions.length &&
-                setDropdownOpen((p) => ({ lokasi: false, hama: !p.hama, pestisida: false }))
-              }
-            />
-            {dropdownOpen.hama && (
-              <DropdownBox
-                items={hamaOptions}
-                onSelect={(option) => { setSelectedPest(option); closeAllDropdowns(); }}
+          <CollapsibleMultiselect
+                label="Kolom"
+                items={tableColumnOptions}
+                selectedItems={selectedColumns}
+                onToggle={(item) =>
+                  setSelectedColumns((prev) =>
+                    prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
+                  )
+                }
               />
-            )}
 
-            <DropdownInput
-              label={`Pestisida${pestisidaOptions.length ? ` (${pestisidaOptions.length})` : ''}`}
-              value={selectedPesticide}
-              onPress={() =>
-                setDropdownOpen((p) => ({ lokasi: false, hama: false, pestisida: !p.pestisida }))
-              }
-            />
-            {dropdownOpen.pestisida && (
-              <DropdownBox
-                items={pestisidaOptions} // includes ALL (no dedupe)
-                onSelect={(option) => { setSelectedPesticide(option); closeAllDropdowns(); }}
+          {showFilters && (
+            <View style={styles.formSection}>
+              <DropdownInput
+                label={`Lokasi (${lokasiOptions.length})`}
+                value={selectedLocation}
+                onPress={() => setDropdownOpen((p) => ({ lokasi: !p.lokasi, hama: false, pestisida: false }))}
               />
-            )}
+              {dropdownOpen.lokasi && (
+                <DropdownBox items={lokasiOptions} onSelect={(option) => { setSelectedLocation(option); closeAllDropdowns(); }} />
+              )}
 
-            <Text style={styles.dateLabel}>Tanggal</Text>
-            <View style={styles.dateRow}>
-              <TouchableOpacity style={styles.dateBox} onPress={() => setShowStart(true)}>
-                <Text style={styles.dateText}>{startDate ? startDate.toLocaleDateString() : 'Start'}</Text>
-                <SvgXml xml={calendarSvg} width={20} height={20} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.dateBox} onPress={() => setShowEnd(true)}>
-                <Text style={styles.dateText}>{endDate ? endDate.toLocaleDateString() : 'End'}</Text>
-                <SvgXml xml={calendarSvg} width={20} height={20} />
-              </TouchableOpacity>
+              <DropdownInput
+                label={`Hama (${hamaOptions.length})`}
+                value={selectedPest}
+                onPress={() => setDropdownOpen((p) => ({ lokasi: false, hama: !p.hama, pestisida: false }))}
+              />
+              {dropdownOpen.hama && (
+                <DropdownBox items={hamaOptions} onSelect={(option) => { setSelectedPest(option); closeAllDropdowns(); }} />
+              )}
+
+              <DropdownInput
+                label={`Pestisida (${pestisidaOptions.length})`}
+                value={selectedPesticide}
+                onPress={() => setDropdownOpen((p) => ({ lokasi: false, hama: false, pestisida: !p.pestisida }))}
+              />
+              {dropdownOpen.pestisida && (
+                <DropdownBox items={pestisidaOptions} onSelect={(option) => { setSelectedPesticide(option); closeAllDropdowns(); }} />
+              )}
+
+              <Text style={styles.dateLabel}>Tanggal</Text>
+              <View style={styles.dateRow}>
+                <TouchableOpacity style={styles.dateBox} onPress={() => setShowStart(true)}>
+                  <Text style={styles.dateText}>{startDate ? startDate.toLocaleDateString() : 'Start'}</Text>
+                  <SvgXml xml={calendarSvg} width={20} height={20} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.dateBox} onPress={() => setShowEnd(true)}>
+                  <Text style={styles.dateText}>{endDate ? endDate.toLocaleDateString() : 'End'}</Text>
+                  <SvgXml xml={calendarSvg} width={20} height={20} />
+                </TouchableOpacity>
+              </View>
+
+              {showStart && (
+                <DateTimePicker value={startDate || new Date()} mode="date" display="default"
+                  onChange={(event, selectedDate) => { setShowStart(false); if (selectedDate) setStartDate(selectedDate); }}
+                />
+              )}
+              {showEnd && (
+                <DateTimePicker value={endDate || new Date()} mode="date" display="default"
+                  onChange={(event, selectedDate) => { setShowEnd(false); if (selectedDate) setEndDate(selectedDate); }}
+                />
+              )}
+
+              <Text style={styles.dateLabel}>Dosis</Text>
+              <NumericRangeInput
+                fromValue={doseFrom}
+                toValue={doseTo}
+                setFromValue={(val) => setDoseFrom(val.replace(/[^0-9]/g, ''))}
+                setToValue={(val) => setDoseTo(val.replace(/[^0-9]/g, ''))}
+              />
+
+              <Text style={styles.dateLabel}>Suhu (°C)</Text>
+              <NumericRangeInput
+                fromValue={tempFrom}
+                toValue={tempTo}
+                setFromValue={(val) => setTempFrom(val.replace(/[^0-9]/g, ''))}
+                setToValue={(val) => setTempTo(val.replace(/[^0-9]/g, ''))}
+              />
+              
             </View>
+          )}
 
-            {showStart && (
-              <DateTimePicker
-                value={startDate || new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => { setShowStart(false); if (selectedDate) setStartDate(selectedDate); }}
-              />
-            )}
-            {showEnd && (
-              <DateTimePicker
-                value={endDate || new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => { setShowEnd(false); if (selectedDate) setEndDate(selectedDate); }}
-              />
-            )}
-
-            <Text style={styles.dateLabel}>Dosis</Text>
-            <NumericRangeInput
-              fromValue={doseFrom}
-              toValue={doseTo}
-              setFromValue={(val) => setDoseFrom(val.replace(/[^0-9]/g, ''))}
-              setToValue={(val) => setDoseTo(val.replace(/[^0-9]/g, ''))}
+          <View style={{ marginTop: 20 }}>
+            <Text style={styles.tableTitle}>Table Summary</Text>
+            <SortableTable
+              columns={tableColumnOptions}
+              selectedColumns={selectedColumns}
+              dataEndpoint="/hpt/ipm"
             />
-
-            <Text style={styles.dateLabel}>Suhu (°C)</Text>
-            <NumericRangeInput
-              fromValue={tempFrom}
-              toValue={tempTo}
-              setFromValue={(val) => setTempFrom(val.replace(/[^0-9]/g, ''))}
-              setToValue={(val) => setTempTo(val.replace(/[^0-9]/g, ''))}
-            />
-
-            <CollapsibleMultiselect
-              label="Kolom"
-              items={tableColumnOptions}
-              selectedItems={selectedColumns}
-              onToggle={(item) =>
-                setSelectedColumns((prev) =>
-                  prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-                )
-              }
-            />
-
-            {/* Empty table preview */}
-            <View style={{ marginTop: 20 }}>
-              <SortableTable
-                columns={tableColumnOptions} // all columns available
-                data={[]}                    // empty dataset
-                selectedColumns={selectedColumns} // will only show checked columns
-              />
-            </View>
           </View>
         </ScrollView>
       </View>
@@ -346,7 +323,36 @@ const styles = StyleSheet.create({
   formSection: { marginTop: 18, gap: 12 },
   dateLabel: { fontSize: 16, fontWeight: '600', color: '#000', marginTop: 10, marginBottom: 6 },
   dateRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  dateBox: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1, borderColor: '#000', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#FFF9F2' },
+  dateBox: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderColor: '#000', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#FFF9F2'
+  },
   dateText: { color: '#333', fontSize: 14 },
+  filterButton: {
+    backgroundColor: '#1D4949',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 10,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    width: '100%',
+
+  },
+  filterButtonText: {
+    color: '#FBF7EB',
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'DMSans-Regular',
+  },
+
+  tableTitle: {
+    fontSize: 16, 
+    fontWeight: '700', 
+    color: '#8B0000', 
+    marginTop: '8',
+    marginBottom: '4'
+  },
 });

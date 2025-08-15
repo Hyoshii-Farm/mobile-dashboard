@@ -54,8 +54,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   text: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'DMSans-Regular',
     color: '#FFFAEE',
+    fontWeight: '600'
   },
 });
