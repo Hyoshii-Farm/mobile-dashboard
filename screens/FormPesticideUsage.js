@@ -16,8 +16,9 @@ import { SvgXml } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
-import Constants from 'expo-constants';
+import { useKindeAuth } from '@kinde/expo';
 import * as ImageManipulator from 'expo-image-manipulator';
+import jwtDecode from 'jwt-decode';
 
 
 import StatusBarCustom from '../components/statusbar';
@@ -27,23 +28,20 @@ import DropdownBox from '../components/DropdownBox';
 import ImageUploadBox from '../components/ImageUploadBox';
 import RoundedButton from '../components/RoundedButton';
 
-/** ---------- Config from app.json ---------- */
-const extra = (Constants?.expoConfig?.extra) || (Constants?.manifest?.extra) || {};
-const API_BASE = extra.EXPO_PUBLIC_API_BASE || 'https://hyoshii-staging.rinal.dev/api/v1';
-const API_BASE_2_ = extra.LOCATION_API_BASE || 'https://dashboard-back-dev.vercel.app/api/v1';
-const PAGE_SIZE = Number(extra.EXPO_PUBLIC_PAGE_SIZE || 10);
+/** ---------- Config from environment ---------- */
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
+const API_BASE_2_ = process.env.LOCATION_API_BASE;
+const PAGE_SIZE = 10;
 const MAX_PAGES = 200;
 
 const CANDIDATE_ENDPOINTS = {
-  lokasi: [extra.LOCATION_API_BASE_PATH || '/location'],
-  hama: [extra.EXPO_PUBLIC_PEST_PATH || '/hama', '/pest', '/pests', '/masterdata/pest'],
-  pestisida: [extra.EXPO_PUBLIC_PESTICIDE_PATH || '/pesticide', '/pesticides', '/masterdata/pesticide'],
+  lokasi: ['/location'],
+  hama: ['/hama', '/pest'],
+  pestisida: ['/pesticide'],
 };
 
-const getAuthHeaders = async () => ({
-  Accept: 'application/json',
-  // Authorization: `Bearer <token>`, // put yours if needed
-});
+// moved into component scope below
+
 
 const buildUrl = (path, page = 1, pageSize = PAGE_SIZE) => {
   const p = new URLSearchParams();
@@ -73,6 +71,19 @@ const clockSvg = `
 
 export default function FormPesticideUsage() {
   const navigation = useNavigation();
+  const { getAccessToken, isAuthenticated, login } = useKindeAuth();
+
+  const getAuthHeaders = React.useCallback(async () => {
+    if (!isAuthenticated) {
+      await login().catch(() => {});
+    }
+    const token = await getAccessToken(process.env.EXPO_PUBLIC_KINDE_AUDIENCE);
+    return {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
+  }, [getAccessToken, isAuthenticated, login]);
 
   // form states
   const [tanggal, setTanggal] = useState(null);

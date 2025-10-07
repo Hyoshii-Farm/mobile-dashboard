@@ -13,7 +13,7 @@ import { SvgXml } from 'react-native-svg';
 const upSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2l3 3H2l3-3z" fill="#1C1B1F"/></svg>`;
 const downSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 8L2 5h6L5 8z" fill="#1C1B1F"/></svg>`;
 
-const API_URL = 'https://hyoshii-staging.rinal.dev/api/v1/hpt/ipm';
+const API_URL = process.env.EXPO_PUBLIC_API_BASE + '/hpt/ipm';
 
 const columnMap = {
   'No.': null,

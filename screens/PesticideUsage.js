@@ -5,7 +5,8 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SvgXml } from 'react-native-svg';
-import Constants from 'expo-constants';
+import jwtDecode from 'jwt-decode';
+import { useKindeAuth } from '@kinde/expo';
 
 import StatusBarCustom from '../components/statusbar';
 import Header from '../components/Header';
@@ -16,23 +17,20 @@ import NumericRangeInput from '../components/NumericRangeInput';
 import CollapsibleMultiselect from '../components/CollapseMulti';
 import SortableTable from '../components/SortableTable';
 
-/** ---------- Config from app.json ---------- */
-const extra = (Constants?.expoConfig?.extra) || (Constants?.manifest?.extra) || {};
-const API_BASE     = extra.EXPO_PUBLIC_API_BASE || 'https://hyoshii-staging.rinal.dev/api/v1';
-const API_BASE_2_  = extra.LOCATION_API_BASE || 'https://dashboard-back-dev.vercel.app/api/v1';
-const PAGE_SIZE    = Number(extra.EXPO_PUBLIC_PAGE_SIZE || 10);
+/** ---------- Config from environment ---------- */
+const API_BASE     = process.env.EXPO_PUBLIC_API_BASE;
+const API_BASE_2_  = process.env.LOCATION_API_BASE;
+const PAGE_SIZE    = 10;
 const MAX_PAGES    = 200;
 
 const CANDIDATE_ENDPOINTS = {
-  lokasi:    [extra.LOCATION_API_BASE_PATH || '/location'],
-  hama:      [extra.EXPO_PUBLIC_PEST_PATH || '/hama', '/pest', '/pests', '/masterdata/pest'],
-  pestisida: [extra.EXPO_PUBLIC_PESTICIDE_PATH || '/pesticide', '/pesticides', '/masterdata/pesticide'],
+  lokasi:    ['/location'],
+  hama:      ['/hama', '/pest'],
+  pestisida: ['/pesticide'],
 };
 
-const getAuthHeaders = async () => ({
-  Accept: 'application/json',
-  'Content-Type': 'application/json',
-});
+// moved into component scope below
+
 
 const backArrowSvg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="19" height="30" viewBox="0 0 19 30" fill="none">
@@ -48,6 +46,19 @@ const calendarSvg = `
 
 export default function PesticideUsagePage() {
   const navigation = useNavigation();
+  const { getAccessToken, isAuthenticated, login } = useKindeAuth();
+
+  const getAuthHeaders = useCallback(async () => {
+    if (!isAuthenticated) {
+      await login().catch(() => {});
+    }
+    const token = await getAccessToken(process.env.EXPO_PUBLIC_KINDE_AUDIENCE);
+    return {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
+  }, [getAccessToken, isAuthenticated, login]);
 
   const [showFilters, setShowFilters] = useState(false);
 
