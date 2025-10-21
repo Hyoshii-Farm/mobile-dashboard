@@ -24,7 +24,7 @@ const PAGE_SIZE    = 10;
 const MAX_PAGES    = 200;
 
 const CANDIDATE_ENDPOINTS = {
-  lokasi:    ['/location'],
+  lokasi:    ['/location/dropdown'],
   hama:      ['/hama', '/pest'],
   pestisida: ['/pesticide'],
 };
