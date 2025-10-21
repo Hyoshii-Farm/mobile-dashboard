@@ -14,6 +14,8 @@ import LogInPage from './screens/LogInPage';
 import Home from './screens/Home';
 import PesticideUsagePage from './screens/PesticideUsage';
 import FormPesticideUsage from './screens/FormPesticideUsage';
+import MortalityPage from './screens/Mortality';
+import FormMortality from './screens/FormMortality';
 
 const Stack = createNativeStackNavigator();
 const navRef = createNavigationContainerRef();
@@ -140,6 +142,8 @@ export default function App() {
           <Stack.Screen name="Home" component={Home} />
           <Stack.Screen name="PesticideUsage" component={PesticideUsagePage} />
           <Stack.Screen name="FormPesticideUsage" component={FormPesticideUsage} />
+          <Stack.Screen name="Mortality" component={MortalityPage} />
+          <Stack.Screen name="FormMortality" component={FormMortality} />
         </Stack.Navigator>
       </NavigationContainer>
     </KindeAuthProvider>
