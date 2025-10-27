@@ -8,8 +8,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { SvgXml } from 'react-native-svg';
 import { useKindeAuth } from '@kinde/expo';
 
-import StatusBarCustom from '../components/statusbar';
-import Header from '../components/Header';
+import ScreenLayout from '../components/ScreenLayout';
 import DropdownInput from '../components/DropdownInput';
 import DropdownBox from '../components/DropdownBox';
 
@@ -36,7 +35,7 @@ const calendarSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox
 
 export default function MortalityPage() {
   const navigation = useNavigation();
-  const { getAccessToken, isAuthenticated, login } = useKindeAuth();
+  const { getAccessToken, isAuthenticated } = useKindeAuth();
 
 
   const [mortalityData, setMortalityData] = useState([]);
@@ -88,12 +87,6 @@ export default function MortalityPage() {
   };
 
   const getAuthHeaders = useCallback(async () => {
-    if (!isAuthenticated) {
-      await login().catch((err) => {
-        console.error('[Auth] Login failed:', err);
-      });
-    }
-    
     const audience = process.env.EXPO_PUBLIC_KINDE_AUDIENCE;
     const token = await getAccessToken(audience);
     
@@ -102,7 +95,7 @@ export default function MortalityPage() {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     };
-  }, [getAccessToken, isAuthenticated, login]);
+  }, [getAccessToken, isAuthenticated]);
 
   const fetchAllPages = useCallback(async (path, pageSize = PAGE_SIZE) => {
     const headers = await getAuthHeaders();
@@ -158,18 +151,17 @@ export default function MortalityPage() {
       setServerStatus('online');
       
     } catch (error) {
-      console.warn(`[Locations] Failed to load from API:`, error.message);
       setServerStatus('offline');
       
-      // Fallback to hardcoded options
-      setLokasiOptions([
-        'Green House 1', 
-        'Green House 2', 
-        'Green House 3', 
-        'Green House 4', 
-        'Green House 5', 
-        'Outdoor 1'
-      ]);
+      // Set empty options and show error to user
+      setLokasiOptions([]);
+      
+      // Show error notification to user
+      Alert.alert(
+        'Gagal Memuat Data',
+        'Gagal mendapatkan daftar lokasi, coba lagi.',
+        [{ text: 'Mengerti', style: 'default' }]
+      );
     } finally {
       setLoading((s) => ({ ...s, lokasi: false }));
     }
@@ -190,16 +182,15 @@ export default function MortalityPage() {
       setVarietasOptions(uniqueVariants);
       
     } catch (error) {
-      console.warn(`[Variants] Failed to load from API:`, error.message);
+      // Set empty options and show error to user
+      setVarietasOptions([]);
       
-      // Fallback to hardcoded options
-      setVarietasOptions([
-        'Tochiotome', 
-        'Momoka', 
-        'Strawberry Red', 
-        'Sweet Charlie', 
-        'Albion'
-      ]);
+      // Show error notification to user
+      Alert.alert(
+        'Gagal Memuat Data',
+        'Gagal mendapatkan daftar varietas, coba lagi.',
+        [{ text: 'Mengerti', style: 'default' }]
+      );
     } finally {
       setLoading((s) => ({ ...s, variant: false }));
     }
@@ -209,40 +200,6 @@ export default function MortalityPage() {
   // const logoutRedirectUri = Linking.createURL('logout');
 
   const fetchMortality = useCallback(async () => {
-    // Skip API calls if server is down 
-    const serverDown = false; // Set to true to use mock data
-    
-    if (serverDown) {
-      setLoading((s) => ({ ...s, mortality: false }));
-      setServerStatus('offline');
-      
-      // Use mock data directly
-      const mockData = [
-        {
-          location_name: "Green House 1",
-          total_plants: 8000,
-          summary: { tanaman_kosong: 12, tanaman_mati: 22, tanaman_sulam: 10 },
-          details: [
-            { id: "gh1_001", date: "18 September 2025", status: "Mati", quantity: 12 },
-            { id: "gh1_002", date: "18 September 2025", status: "Sulam", quantity: 10 },
-            { id: "gh1_003", date: "17 September 2025", status: "Mati", quantity: 10 },
-          ]
-        },
-        {
-          location_name: "Green House 2", 
-          total_plants: 8000,
-          summary: { tanaman_kosong: 5, tanaman_mati: 18, tanaman_sulam: 7 },
-          details: [
-            { id: "gh2_001", date: "16 September 2025", status: "Mati", quantity: 8 },
-            { id: "gh2_002", date: "15 September 2025", status: "Sulam", quantity: 5 },
-          ]
-        }
-      ];
-      
-      setMortalityData(mockData);
-      return;
-    }
-
     let lastErr = null;
 
     try {
@@ -264,10 +221,7 @@ export default function MortalityPage() {
         },
         details: (item.details || []).map(detail => {
           const id = detail.id || detail._id || detail.mortality_id;
-          // Only log if ID is missing or unexpected
-          if (!id) {
-            console.warn(`[Mortality] Missing ID for detail:`, detail);
-          }
+          // Skip logging missing IDs in production
           return {
             id: id, // Preserve actual API ID
             date: detail.planting_date || detail.date,
@@ -284,40 +238,18 @@ export default function MortalityPage() {
       setMortalityData(transformedData);
       return;
     } catch (error) {
-      console.warn(`[Mortality] API failed:`, error.message);
       setServerStatus('offline');
-      lastErr = error;
+      setError('Gagal mendapatkan data mortalitas, coba lagi.');
+      setMortalityData([]);
+      
+      Alert.alert(
+        'Gagal Memuat Data',
+        'Gagal mendapatkan data mortalitas, coba lagi.',
+        [{ text: 'Mengerti', style: 'default' }]
+      );
     } finally {
       setLoading((s) => ({ ...s, mortality: false }));
     }
-
-    const msg = (lastErr && (lastErr.message || String(lastErr))) || 'Unknown error';
-    console.warn(`Mortality API failed, using mock data: ${msg}`);
-    setServerStatus('offline');
-    
-    // Fallback to mock data on error (for development/testing)
-    const mockData = [
-      {
-        location_name: "Green House 1",
-        total_plants: 8000,
-        summary: { tanaman_kosong: 12, tanaman_mati: 22, tanaman_sulam: 10 },
-        details: [
-          { id: "gh1_001", date: "18 September 2025", status: "Mati", quantity: 12 },
-          { id: "gh1_002", date: "18 September 2025", status: "Sulam", quantity: 10 },
-          { id: "gh1_003", date: "17 September 2025", status: "Mati", quantity: 10 },
-        ]
-      },
-      {
-        location_name: "Green House 2", 
-        total_plants: 8000,
-        summary: { tanaman_kosong: 5, tanaman_mati: 18, tanaman_sulam: 7 },
-        details: [
-          { id: "gh2_001", date: "16 September 2025", status: "Mati", quantity: 8 },
-          { id: "gh2_002", date: "15 September 2025", status: "Sulam", quantity: 5 },
-        ]
-      }
-    ];
-    setMortalityData(mockData);
   }, [fetchAllPages]);
 
   useEffect(() => {
@@ -385,7 +317,7 @@ export default function MortalityPage() {
         }
       }
     } catch (error) {
-      console.warn('Failed to parse date:', detail.date, error);
+      // Silent date parsing error in production
     }
 
     // Find the location data to get current totals and variety
@@ -455,11 +387,7 @@ export default function MortalityPage() {
                   ]
                 );
               } else {
-                // Check if this is a mock ID that won't work with real API
-                const isMockId = recordId && typeof recordId === 'string' && (recordId.startsWith('gh1_') || recordId.startsWith('gh2_'));
-                const errorMsg = isMockId 
-                  ? 'Data mock tidak dapat dihapus dari server. Gunakan data asli dari API.'
-                  : result.msg || 'Gagal menghapus data. Silakan coba lagi.';
+                const errorMsg = result.msg || 'Gagal menghapus data. Silakan coba lagi.';
                   
                 Alert.alert('Gagal Menghapus', errorMsg, [
                   { text: 'Mengerti', style: 'default' }
@@ -471,7 +399,6 @@ export default function MortalityPage() {
                 'Terjadi kesalahan saat menghapus data. Silakan coba lagi.',
                 [{ text: 'Mengerti', style: 'default' }]
               );
-              console.error('Delete error:', error);
             }
           },
         },
@@ -591,7 +518,6 @@ export default function MortalityPage() {
         msg: errorMsg,
       };
     } catch (error) {
-      console.error(`[Mortality] Update network error:`, error.message);
       return {
         ok: false,
         msg: 'Koneksi bermasalah. Periksa internet Anda.',
@@ -809,8 +735,8 @@ export default function MortalityPage() {
       }
 
       const mortalityRecord = {
-        location_id: 1, // TODO: Map from formData.lokasi to actual location_id
-        variant_id: 1,  // TODO: Map from formData.varietas to actual variant_id
+        location_id: 1, // Note: Using default location_id - should be mapped from formData.lokasi
+        variant_id: 1,  // Note: Using default variant_id - should be mapped from formData.varietas
         planting_date: formData.tanggal.toISOString(),
         add: {
           quantity: parseInt(formData.tanamanSulam, 10) || 0,
@@ -852,23 +778,20 @@ export default function MortalityPage() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); closeAllDropdowns(); }}>
-      <View style={styles.container}>
-        <StatusBarCustom backgroundColor="#1D4949" />
-
-      <Header
-        title="Mortalitas"
-        logoSvg={backArrowSvg}
-        onLeftPress={() => navigation.navigate('Home')}
-        showHomeButton={false}
-      />
+    <ScreenLayout 
+      headerTitle="Mortality"
+      headerLogoSvg={backArrowSvg}
+      onHeaderLeftPress={() => navigation.navigate('Home')}
+    >
+      <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); closeAllDropdowns(); }}>
+        <View style={styles.contentContainer}>
 
       <ScrollView 
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={closeAllDropdowns}
       >
-        <Text style={styles.title}>MORTALITAS</Text>
+        <Text style={styles.title}>MORTALITY</Text>
         
         {/* Server Status Alert */}
         {serverStatus === 'offline' && (
@@ -1088,9 +1011,6 @@ export default function MortalityPage() {
                         <Text style={[styles.detailText, styles.dateColumn]}>{detail.date}</Text>
                         <View style={[styles.detailText, styles.statusColumn]}>
                           <Text>{detail.status}</Text>
-                          {(detail.id && typeof detail.id === 'string' && (detail.id.startsWith('gh1_') || detail.id.startsWith('gh2_'))) && (
-                            <Text style={styles.mockBadge}>MOCK</Text>
-                          )}
                         </View>
                         <Text style={[styles.detailText, styles.quantityColumn]}>{detail.quantity}</Text>
                         <View style={[styles.menuCell, styles.menuColumn]}>
@@ -1101,11 +1021,7 @@ export default function MortalityPage() {
                             <SvgXml xml={editIconSvg} width={16} height={16} />
                           </TouchableOpacity>
                           <TouchableOpacity 
-                            style={[
-                              styles.actionButton,
-                              // Only disable if it's actually mock data (string IDs starting with gh1_ or gh2_)
-                              (detail.id && typeof detail.id === 'string' && (detail.id.startsWith('gh1_') || detail.id.startsWith('gh2_'))) && styles.disabledButton
-                            ]}
+                            style={styles.actionButton}
                             onPress={() => handleDeleteRecord(item.location_name, detail)}
                           >
                             <SvgXml xml={deleteIconSvg} width={16} height={16} />
@@ -1121,13 +1037,14 @@ export default function MortalityPage() {
         </View>
         </View>
       </ScrollView>
-    </View>
-    </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF9F2' },
+  contentContainer: { flex: 1, backgroundColor: '#FFF9F2' },
   statusRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 10 },
   statusInfo: { fontSize: 12, color: '#6b7280' },
   statusOK: { fontSize: 12, color: '#16a34a' },
@@ -1469,12 +1386,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-  mockBadge: {
-    fontSize: 8,
-    color: '#ff6b35',
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
+
   disabledButton: {
     opacity: 0.4,
   },

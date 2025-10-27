@@ -7,19 +7,13 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  Image,
-  Modal,
-  Pressable,
-  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SvgXml } from 'react-native-svg';
-import * as Linking from 'expo-linking';
 import { useKindeAuth } from '@kinde/expo';
 
-import StatusBarCustom from '../components/statusbar';
-import Header from '../components/Header';
+import ScreenLayout from '../components/ScreenLayout';
 import DropdownInput from '../components/DropdownInput';
 import DropdownBox from '../components/DropdownBox';
 
@@ -37,13 +31,7 @@ const calendarSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox
 
 export default function FormMortality() {
   const navigation = useNavigation();
-  const { getUserProfile, logout, getAccessToken, isAuthenticated, login } = useKindeAuth();
-
-  // User profile state
-  const [initials, setInitials] = useState('');
-  const [profilePic, setProfilePic] = useState(null);
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { getAccessToken, isAuthenticated, login } = useKindeAuth();
 
   // Form State
   const [tanggal, setTanggal] = useState(new Date());
@@ -63,22 +51,17 @@ export default function FormMortality() {
     varietas: false,
   });
   
-  const [lokasiOptions, setLokasiOptions] = useState([]);
   const [varietasOptions, setVarietasOptions] = useState([]);
-
-  const logoutRedirectUri = Linking.createURL('logout');
 
   // Fetch variants from API
   const fetchVariants = useCallback(async () => {
     try {
       const headers = await getAuthHeaders();
       const url = `${API_BASE}${ENDPOINTS.variant}?search=&page=1&pageSize=100`;
-      console.log(`[FormMortality] Fetching variants from ${url}`);
       
       const response = await fetch(url, { headers });
       if (response.ok) {
         const data = await response.json();
-        console.log(`[FormMortality] Variants response:`, data);
         
         // Extract variants array from response
         const variants = data?.items || data?.data || data || [];
@@ -88,33 +71,31 @@ export default function FormMortality() {
         }));
         
         setVarietasOptions(variantOptions);
-        console.log(`[FormMortality] Loaded ${variantOptions.length} variants`);
       } else {
-        console.warn(`[FormMortality] Failed to fetch variants: ${response.status}`);
-        // Fallback to hardcoded options
-        setVarietasOptions([
-          { id: 1, name: 'Tochiotome' },
-          { id: 2, name: 'Strawberry Red' },
-          { id: 3, name: 'Sweet Charlie' },
-          { id: 4, name: 'Albion' }
-        ]);
+        // Set empty options and show error to user
+        setVarietasOptions([]);
+        
+        Alert.alert(
+          'Gagal Memuat Data',
+          'Gagal mendapatkan daftar varietas, coba lagi.',
+          [{ text: 'Mengerti', style: 'default' }]
+        );
       }
     } catch (error) {
-      console.warn(`[FormMortality] Error fetching variants:`, error);
-      // Fallback to hardcoded options
-      setVarietasOptions([
-        { id: 1, name: 'Tochiotome' },
-        { id: 2, name: 'Strawberry Red' },
-        { id: 3, name: 'Sweet Charlie' },
-        { id: 4, name: 'Albion' }
-      ]);
+      // Set empty options and show error to user
+      setVarietasOptions([]);
+      
+      Alert.alert(
+        'Gagal Memuat Data',
+        'Gagal mendapatkan daftar varietas, coba lagi.',
+        [{ text: 'Mengerti', style: 'default' }]
+      );
     }
   }, [getAuthHeaders]);
 
   // Authentication helpers
   const getAuthHeaders = useCallback(async () => {
     if (!isAuthenticated) {
-      console.log('[FormMortality auth] Not authenticated, attempting login...');
       await login();
       return {};
     }
@@ -126,7 +107,6 @@ export default function FormMortality() {
         'Authorization': `Bearer ${token}`,
       };
     } catch (e) {
-      console.warn('[FormMortality auth] getAccessToken failed:', e?.message || e);
       return {
         'Content-Type': 'application/json',
       };
@@ -138,9 +118,6 @@ export default function FormMortality() {
     try {
       const url = `${API_BASE}${ENDPOINTS.mortality}`;
       const headers = await getAuthHeaders();
-      
-      console.log(`[FormMortality] POST ${url}`);
-      console.log(`[FormMortality] Payload:`, JSON.stringify(payload, null, 2));
       
       const res = await fetch(url, {
         method: 'POST',
@@ -154,20 +131,7 @@ export default function FormMortality() {
         json = JSON.parse(text);
       } catch {}
 
-      console.log(`[FormMortality] Response Status: ${res.status}`);
-      console.log(`[FormMortality] Response Data:`, json ?? text);
-
       if (res.ok) {
-        console.log(`[FormMortality] ✅ SUCCESS - Data submitted to approval queue`);
-        
-        // Log any important response data
-        if (json && json.id) {
-          console.log(`[FormMortality] Created record ID: ${json.id}`);
-        }
-        if (json && json.transaction_id) {
-          console.log(`[FormMortality] Transaction ID: ${json.transaction_id}`);
-        }
-        
         return {
           ok: true,
           status: res.status,
@@ -176,7 +140,6 @@ export default function FormMortality() {
         };
       } else {
         const errorMsg = json?.message || json?.error || text || 'Failed to save data';
-        console.warn(`[FormMortality] ❌ FAILED:`, errorMsg);
         return {
           ok: false,
           status: res.status,
@@ -185,7 +148,6 @@ export default function FormMortality() {
         };
       }
     } catch (e) {
-      console.warn(`[FormMortality] ❌ ERROR:`, e.message);
       return {
         ok: false,
         status: 0,
@@ -195,57 +157,9 @@ export default function FormMortality() {
     }
   };
 
-  // Handle deep link after logout returns
   useEffect(() => {
-    const handleUrl = ({ url }) => {
-      const lower = (url || '').toLowerCase();
-      const parsed = Linking.parse(url);
-      const path = (parsed?.path || '').toLowerCase();
-      if (lower.includes('logout') || path.includes('logout')) {
-        setIsLoggingOut(false);
-        setMenuVisible(false);
-        navigation.reset({ index: 0, routes: [{ name: 'LogIn' }] });
-      }
-    };
-
-    Linking.getInitialURL().then((url) => url && handleUrl({ url }));
-    const sub = Linking.addEventListener('url', handleUrl);
-    return () => sub.remove();
-  }, [navigation]);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await getUserProfile();
-        if (user?.picture) {
-          setProfilePic(user.picture);
-        } else if (user?.email) {
-          const namePart = user.email.split('@')[0];
-          const chars = namePart
-            .split(/[.\-_]/)
-            .map((part) => part.charAt(0).toUpperCase())
-            .join('');
-          setInitials(chars || namePart.charAt(0).toUpperCase());
-        }
-      } catch (err) {
-        console.error('Failed to get user profile:', err);
-      }
-    };
-    fetchUser();
     fetchVariants();
-  }, [getUserProfile, fetchVariants]);
-
-  const handleLogout = async () => {
-    try {
-      setIsLoggingOut(true);
-      await logout({ logoutRedirectUri });
-    } catch (err) {
-      console.error('Kinde logout failed:', err);
-      setIsLoggingOut(false);
-      setMenuVisible(false);
-      navigation.reset({ index: 0, routes: [{ name: 'LogIn' }] });
-    }
-  };
+  }, [fetchVariants]);
 
   // Calculate total tanaman setelahnya
   useEffect(() => {
@@ -277,8 +191,18 @@ export default function FormMortality() {
   };
 
   const handleSimpan = async () => {
-    if (!lokasi || !varietas || !tanggal || !lokasiId || !varietasId) {
-      Alert.alert('Form Tidak Lengkap', 'Harap isi semua kolom yang wajib dan pastikan lokasi/varietas telah dimuat.');
+    if (!varietas || !tanggal || !varietasId) {
+      Alert.alert('Form Tidak Lengkap', 'Harap isi semua kolom yang wajib dan pastikan varietas telah dimuat.');
+      return;
+    }
+    
+    // Temporary validation for lokasi since it's not implemented yet
+    if (!lokasi) {
+      Alert.alert(
+        'Lokasi Diperlukan',
+        'Fitur pemilihan lokasi belum tersedia. Silakan gunakan form di halaman Mortality untuk sementara.',
+        [{ text: 'Mengerti', style: 'default' }]
+      );
       return;
     }
     
@@ -297,13 +221,11 @@ export default function FormMortality() {
       }
     };
     
-    console.log(`[FormMortality] Submitting with backend format:`, mortalityRecord);
-    
     const res = await postToApi(mortalityRecord);
 
     if (res && res.ok) {
       Alert.alert('Berhasil', 
-        'Data berhasil dikirim!\n\nCatatan: Pengajuan Anda telah dikirim ke antrian persetujuan dan akan muncul di dashboard setelah disetujui oleh administrator.', 
+        'Data berhasil dikirim!', 
         [
           { text: 'OK', onPress: () => {
               resetForm();
@@ -317,60 +239,11 @@ export default function FormMortality() {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBarCustom backgroundColor="#1D4949" />
-
-      <Header
-        title="MORTALITY"
-        logoSvg={backArrowSvg}
-        onLeftPress={() => navigation.navigate('Mortality')}
-        showHomeButton={false}
-        profileContent={
-          <TouchableOpacity style={styles.avatar} onPress={() => setMenuVisible(true)}>
-            {profilePic ? (
-              <Image source={{ uri: profilePic }} style={styles.avatarImage} />
-            ) : (
-              <Text style={styles.avatarText}>{initials}</Text>
-            )}
-          </TouchableOpacity>
-        }
-      />
-
-      <Modal
-        visible={menuVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => !isLoggingOut && setMenuVisible(false)}
-      >
-        <Pressable
-          style={styles.backdrop}
-          onPress={() => {
-            if (!isLoggingOut) setMenuVisible(false);
-          }}
-        >
-          <View style={styles.menuContainer}>
-            <Pressable>
-              <View style={styles.menu}>
-                <TouchableOpacity
-                  style={[styles.menuItem, isLoggingOut && styles.menuItemDisabled]}
-                  onPress={handleLogout}
-                  disabled={isLoggingOut}
-                >
-                  {isLoggingOut ? (
-                    <View style={styles.rowCenter}>
-                      <ActivityIndicator size="small" />
-                      <Text style={[styles.menuItemText, { marginLeft: 8 }]}>Keluar…</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.menuItemText}>Keluar</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
-
+    <ScreenLayout
+      headerTitle="Form Mortalitas"
+      headerLogoSvg={backArrowSvg}
+      onHeaderLeftPress={() => navigation.goBack()}
+    >
       <ScrollView 
         contentContainerStyle={styles.scrollContainer} 
         keyboardShouldPersistTaps="handled"
@@ -399,23 +272,15 @@ export default function FormMortality() {
           <Text style={styles.label}>Lokasi<Text style={styles.required}>*</Text></Text>
           <DropdownInput 
             value={lokasi} 
-            onPress={() => setDropdownOpen(prev => ({ ...prev, lokasi: !prev.lokasi }))} 
+            onPress={() => {
+              Alert.alert(
+                'Fitur Belum Tersedia',
+                'Pilihan lokasi akan ditambahkan pada versi selanjutnya.',
+                [{ text: 'Mengerti', style: 'default' }]
+              );
+            }} 
             placeholder="Pilih Lokasi"
           />
-          {dropdownOpen.lokasi && (
-            <DropdownBox 
-              items={lokasiOptions.map(loc => typeof loc === 'string' ? loc : loc.name)} 
-              onSelect={(opt) => { 
-                // Find the selected location object to get the ID
-                const selectedLocation = lokasiOptions.find(loc => 
-                  (typeof loc === 'string' ? loc : loc.name) === opt
-                );
-                setLokasi(opt); 
-                setLokasiId(selectedLocation?.id || null);
-                closeAllDropdowns(); 
-              }} 
-            />
-          )}
         </View>
 
         <View style={styles.fieldSpacing}>
@@ -433,7 +298,6 @@ export default function FormMortality() {
                 const selectedVariant = varietasOptions.find(variant => variant.name === opt);
                 setVarietas(opt); 
                 setVarietasId(selectedVariant?.id || null);
-                console.log(`[FormMortality] Selected variant: ${opt} (ID: ${selectedVariant?.id})`);
                 closeAllDropdowns(); 
               }} 
             />
@@ -502,52 +366,12 @@ export default function FormMortality() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </ScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF9F2' },
   scrollContainer: { padding: 20, paddingBottom: 40 },
-
-  // Header styles (copied from Mortality.js)
-  avatar: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#FFFFF8', alignItems: 'center',
-    justifyContent: 'center', overflow: 'hidden',
-  },
-  avatarImage: { width: '100%', height: '100%', borderRadius: 18 },
-  avatarText: { color: '#1D4949', fontWeight: 'bold' },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-  },
-  menuContainer: {
-    alignItems: 'flex-end',
-    paddingTop: 80,
-    paddingRight: 16,
-  },
-  menu: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingVertical: 6,
-    minWidth: 120,
-    alignItems: 'center',
-    elevation: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 6,
-  },
-  menuItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    minWidth: 120,
-    alignItems: 'center',
-  },
-  menuItemDisabled: { opacity: 0.6 },
-  menuItemText: { color: '#1D4949', fontWeight: '600' },
-  rowCenter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
 
   // Form styles
   fieldSpacing: { marginBottom: 16 },
