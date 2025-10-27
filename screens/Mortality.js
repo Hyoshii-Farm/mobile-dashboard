@@ -901,10 +901,9 @@ export default function MortalityPage() {
                 <Text style={styles.mortalityLabel}>Total Tanaman Saat Ini</Text>
                 <View style={styles.inputWithUnit}>
                   <TextInput 
-                    style={styles.mortalityInput} 
+                    style={[styles.mortalityInput, styles.readOnly]} 
                     value={formData.totalTanamanSaatIni} 
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, totalTanamanSaatIni: text }))}
-                    keyboardType="number-pad"
+                    editable={false}
                     placeholder="8000"
                   />
                   <Text style={styles.unitLabel}>tanaman</Text>
@@ -919,7 +918,7 @@ export default function MortalityPage() {
                     value={formData.tanamanMati} 
                     onChangeText={(text) => setFormData(prev => ({ ...prev, tanamanMati: text }))}
                     keyboardType="number-pad"
-                    placeholder="80"
+                    placeholder="0"
                   />
                 </View>
                 <View style={styles.halfInput}>
