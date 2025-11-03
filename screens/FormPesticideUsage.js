@@ -35,7 +35,7 @@ const PAGE_SIZE = 10;
 const MAX_PAGES = 200;
 
 const CANDIDATE_ENDPOINTS = {
-  lokasi: ['/location'],
+  lokasi: ['/location/dropdown'],
   hama: ['/hama', '/pest'],
   pestisida: ['/pesticide'],
 };
@@ -86,16 +86,15 @@ export default function FormPesticideUsage() {
   }, [getAccessToken, isAuthenticated, login]);
 
   // form states
-  const [tanggal, setTanggal] = useState(null);
+  const [tanggal, setTanggal] = useState(new Date()); // Default to today
   const [showTanggal, setShowTanggal] = useState(false);
   const [lokasi, setLokasi] = useState('');
   const [hama, setHama] = useState('');
   const [pestisida, setPestisida] = useState('');
-  const [bahanAktif, setBahanAktif] = useState('');
   const [penggunaan1, setPenggunaan1] = useState('');
   const [dosisValue, setDosisValue] = useState('');
   const [dosisUnit, setDosisUnit] = useState('ml');
-  const [penggunaan2, setPenggunaan2] = useState('');
+  const [penggunaan2, setPenggunaan2] = useState('1'); // Hidden field, default to 1
   const [suhu, setSuhu] = useState('');
   const [tenagaKerja, setTenagaKerja] = useState('');
   const [pic, setPic] = useState('');  // pic: name of the person performing the treatment (grower's names)
@@ -227,7 +226,14 @@ export default function FormPesticideUsage() {
             active_ingredient: x?.active_ingredient ?? x?.activeIngredient ?? '',
           }));
           setPestisidaObjects([...objs].sort((a,b)=>a.name.localeCompare(b.name)));
-          setPestisidaLabels(objs.map(o=>o.name).sort((a,b)=>a.localeCompare(b)));
+          
+          // Create combined labels in format "name - active_ingredient"
+          const combinedLabels = objs.map(o => {
+            const activeIngredient = o.active_ingredient || 'Unknown ingredient';
+            return `${o.name} - ${activeIngredient}`;
+          }).sort((a,b)=>a.localeCompare(b));
+          
+          setPestisidaLabels(combinedLabels);
           return;
         } catch (e) {
           console.warn('[Form pestisida] fallback path failed', path, e?.message || e);
@@ -270,7 +276,13 @@ export default function FormPesticideUsage() {
 
   const pestisidaIdByLabel = useMemo(() => {
     const m = {};
-    for (const x of pestisidaObjects) if (x?.name && x?.id != null) m[x.name] = x.id;
+    for (const x of pestisidaObjects) {
+      if (x?.name && x?.id != null) {
+        const activeIngredient = x.active_ingredient || 'Unknown ingredient';
+        const combinedLabel = `${x.name} - ${activeIngredient}`;
+        m[combinedLabel] = x.id;
+      }
+    }
     return m;
   }, [pestisidaObjects]);
 
@@ -323,8 +335,8 @@ export default function FormPesticideUsage() {
   };
 
   const resetForm = () => {
-    setTanggal(null); setLokasi(''); setHama(''); setPestisida(''); setBahanAktif('');
-    setPenggunaan1(''); setDosisValue(''); setDosisUnit('ml'); setPenggunaan2('');
+    setTanggal(new Date()); setLokasi(''); setHama(''); setPestisida('');
+    setPenggunaan1(''); setDosisValue(''); setDosisUnit('ml'); setPenggunaan2('1');
     setSuhu(''); setTenagaKerja(''); setPic(''); setDescription(''); setPhoto(null); setStartTime(null); setEndTime(null);
     setDropdownOpen(dropdownOpenDefault);
   };
@@ -332,38 +344,80 @@ export default function FormPesticideUsage() {
   // ----- ALWAYS multipart/form-data -----
 const postToApi = async (payload) => {
   const url = `${API_BASE}/hpt/ipm`;
+  
+  console.log('[FormPesticideUsage] ===== POST API START =====');
+  console.log('[FormPesticideUsage] POST URL:', url);
+  console.log('[FormPesticideUsage] Payload to send:');
+  console.log(JSON.stringify(payload, null, 2));
+  
   const headers = await getAuthHeaders();
   headers['Content-Type'] = 'application/json';
+  
+  console.log('[FormPesticideUsage] Auth headers:', {
+    ...headers,
+    Authorization: headers.Authorization ? 'Bearer [TOKEN_PRESENT]' : 'None'
+  });
 
-  const res = await fetch(url, {
+  const requestOptions = {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
+  };
+  
+  console.log('[FormPesticideUsage] Request options:', {
+    method: requestOptions.method,
+    headers: requestOptions.headers,
+    bodyLength: requestOptions.body.length
   });
 
+  const res = await fetch(url, requestOptions);
+  
+  console.log('[FormPesticideUsage] POST response status:', res.status, res.statusText);
+  console.log('[FormPesticideUsage] POST response headers:', Object.fromEntries(res.headers.entries()));
+
   const text = await res.text();
+  console.log('[FormPesticideUsage] Raw response text:', text);
+  
   let json = null;
   try {
     json = JSON.parse(text);
-  } catch {}
+    console.log('[FormPesticideUsage] Parsed JSON response:');
+    console.log(JSON.stringify(json, null, 2));
+  } catch (parseError) {
+    console.warn('[FormPesticideUsage] Failed to parse JSON response:', parseError.message);
+  }
 
-  return {
+  const result = {
     ok: res.ok,
     status: res.status,
     msg: json?.message || json?.error || text,
     data: json ?? text,
   };
+  
+  console.log('[FormPesticideUsage] ===== POST API RESULT =====');
+  console.log('[FormPesticideUsage] Success:', result.ok);
+  console.log('[FormPesticideUsage] Status:', result.status);
+  console.log('[FormPesticideUsage] Message:', result.msg);
+  
+  return result;
 };
 
 
 const uploadToCloudinary = async (uri) => {
+console.log('[FormPesticideUsage] ===== IMAGE UPLOAD START =====');
+console.log('[FormPesticideUsage] Original image URI:', uri);
+
 const compressed = await ImageManipulator.manipulateAsync(
 uri,
 [{ resize: { width: 1280 } }],
 { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
 );
 
+console.log('[FormPesticideUsage] Compressed image URI:', compressed.uri);
+
 const fileName = compressed.uri.split('/').pop();
+console.log('[FormPesticideUsage] Generated filename:', fileName);
+
 const formData = new FormData();
 formData.append('file', {
 uri: compressed.uri,
@@ -373,22 +427,68 @@ type: 'image/jpeg',
 formData.append('upload_preset', 'ml_default');
 formData.append('cloud_name', 'dsja6uts0');
 
-const res = await fetch('https://api.cloudinary.com/v1_1/dsja6uts0/image/upload', {
+console.log('[FormPesticideUsage] FormData prepared for Cloudinary upload');
+console.log('[FormPesticideUsage] Upload preset: ml_default');
+console.log('[FormPesticideUsage] Cloud name: dsja6uts0');
+
+const cloudinaryUrl = 'https://api.cloudinary.com/v1_1/dsja6uts0/image/upload';
+console.log('[FormPesticideUsage] Cloudinary URL:', cloudinaryUrl);
+
+const res = await fetch(cloudinaryUrl, {
 method: 'POST',
 body: formData,
 });
 
+console.log('[FormPesticideUsage] Cloudinary response status:', res.status, res.statusText);
+
 const data = await res.json();
-if (data.secure_url) return data.secure_url;
-else throw new Error('Upload failed: ' + JSON.stringify(data));
+console.log('[FormPesticideUsage] Cloudinary response data:');
+console.log(JSON.stringify(data, null, 2));
+
+if (data.secure_url) {
+  console.log('[FormPesticideUsage] ===== IMAGE UPLOAD SUCCESS =====');
+  console.log('[FormPesticideUsage] Uploaded image URL:', data.secure_url);
+  return data.secure_url;
+} else {
+  console.error('[FormPesticideUsage] ===== IMAGE UPLOAD FAILED =====');
+  console.error('[FormPesticideUsage] Error data:', JSON.stringify(data, null, 2));
+  throw new Error('Upload failed: ' + JSON.stringify(data));
+}
 };
 
 const handleAdd = async () => {
-if (!tanggal || !lokasi || !hama || !pestisida || !penggunaan1 || !dosisValue || !penggunaan2 || !suhu || !startTime || !endTime || !tenagaKerja || !pic) {
+console.log('[FormPesticideUsage] ===== FORM SUBMISSION START =====');
+console.log('[FormPesticideUsage] Form validation check...');
+
+const requiredFields = {
+  tanggal, lokasi, hama, pestisida, penggunaan1, dosisValue, suhu, startTime, endTime, tenagaKerja
+};
+console.log('[FormPesticideUsage] Required fields status:', {
+  tanggal: !!tanggal,
+  lokasi: !!lokasi,
+  hama: !!hama,
+  pestisida: !!pestisida,
+  penggunaan1: !!penggunaan1,
+  dosisValue: !!dosisValue,
+  suhu: !!suhu,
+  startTime: !!startTime,
+  endTime: !!endTime,
+  tenagaKerja: !!tenagaKerja
+});
+
+if (!tanggal || !lokasi || !hama || !pestisida || !penggunaan1 || !dosisValue || !suhu || !startTime || !endTime || !tenagaKerja) {
 Alert.alert('Form Incomplete', 'Please fill in all required fields (*) before submitting.');
+console.log('[FormPesticideUsage] Form validation failed - missing required fields');
 return;
 }
 
+console.log('[FormPesticideUsage] Form validation passed');
+
+// Extract pesticide name from combined label for API payload
+const pestisidaName = pestisida ? pestisida.split(' - ')[0] : '';
+console.log('[FormPesticideUsage] Extracted pesticide name:', pestisidaName);
+
+console.log('[FormPesticideUsage] Building payload...');
 const payload = {
 datetime: toDateYYYYMMDD(tanggal),
 start: toHHMM(startTime),
@@ -402,23 +502,35 @@ temperature: parseFloat(suhu),
 manpower: parseInt(tenagaKerja, 10),
 ...(lokasiIdByLabel[lokasi] ? { location_id: lokasiIdByLabel[lokasi] } : { location_name: lokasi }),
 ...(hamaIdByLabel[hama] ? { pest_id: hamaIdByLabel[hama] } : { pest_name: hama }),
-...(pestisidaIdByLabel[pestisida] ? { pesticide_id: pestisidaIdByLabel[pestisida] } : { pesticide_name: pestisida }),
-pic,
+...(pestisidaIdByLabel[pestisida] ? { pesticide_id: pestisidaIdByLabel[pestisida] } : { pesticide_name: pestisidaName }),
+pic: pic || 'System', // Default value since field is removed
 description,
 };
 
 if (photo) {
+console.log('[FormPesticideUsage] Photo detected, uploading to Cloudinary...');
 try {
 const imageUrl = await uploadToCloudinary(photo);
 payload.picture = imageUrl;
+console.log('[FormPesticideUsage] Photo upload successful, added to payload');
 } catch (e) {
+console.error('[FormPesticideUsage] Photo upload failed:', e.message);
 Alert.alert('Upload Failed', 'Gagal mengunggah gambar ke Cloudinary.');
 return;
 }
+} else {
+console.log('[FormPesticideUsage] No photo to upload');
 }
 
+console.log('[FormPesticideUsage] Final payload ready for API:');
+console.log(JSON.stringify(payload, null, 2));
+
 const res = await postToApi(payload);
+
+console.log('[FormPesticideUsage] ===== FORM SUBMISSION RESULT =====');
 if (res.ok) {
+console.log('[FormPesticideUsage] Form submission SUCCESS!');
+console.log('[FormPesticideUsage] Response data:', res.data);
 Alert.alert(
 'Success',
 'Data berhasil disimpan.',
@@ -426,6 +538,7 @@ Alert.alert(
 {
 text: 'OK',
 onPress: () => {
+console.log('[FormPesticideUsage] Resetting form and navigating to PesticideUsage');
 resetForm();
 navigation.navigate('PesticideUsage');
 }
@@ -434,16 +547,17 @@ navigation.navigate('PesticideUsage');
 { cancelable: false }
 );
 } else {
+console.error('[FormPesticideUsage] Form submission FAILED!');
+console.error('[FormPesticideUsage] Error status:', res.status);
+console.error('[FormPesticideUsage] Error message:', res.msg);
+console.error('[FormPesticideUsage] Full error response:', res);
 Alert.alert('Gagal menyimpan', res.msg);
-console.log('API Error:', res);
 }
 };
 
 
-  const onSelectPestisida = (label) => {
-    setPestisida(label);
-    const obj = pestisidaObjects.find((o) => o.name === label) || null;
-    setBahanAktif(obj?.active_ingredient || '');
+  const onSelectPestisida = (combinedLabel) => {
+    setPestisida(combinedLabel);
   };
 
   return (
@@ -519,13 +633,7 @@ console.log('API Error:', res);
             )}
           </View>
 
-          {/* Bahan Aktif (read-only) */}
-          <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Bahan Aktif</Text>
-            <View style={styles.readOnlyBox}>
-              <Text style={styles.readOnlyText}>{bahanAktif || ''}</Text>
-            </View>
-          </View>
+
 
           {/* Penggunaan / Treatment */}
           <View style={styles.fieldSpacing}>
@@ -572,18 +680,7 @@ console.log('API Error:', res);
             )}
           </View>
 
-          {/* Jumlah Penggunaan */}
-          <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Jumlah Penggunaan <Text style={{ color: '#8B2D2D' }}>*</Text></Text>
-            <TextInput
-              style={styles.textInputBox}
-              value={penggunaan2}
-              onChangeText={(val) => setPenggunaan2(val.replace(/[^0-9.]/g, ''))}
-              keyboardType="numeric"
-              placeholder="0"
-              placeholderTextColor="#999"
-            />
-          </View>
+          {/* Jumlah Penggunaan - Hidden field, automatically set to 1 */}
 
           {/* Suhu */}
           <View style={styles.fieldSpacing}>
@@ -618,17 +715,7 @@ console.log('API Error:', res);
             />
           </View>
 
-          {/* Grower's Name (pic) */}
-          <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Grower's Name</Text>
-            <TextInput
-              style={styles.textInputBox}
-              value={pic}
-              onChangeText={setPic}
-              placeholder="Enter grower's name(s)"
-              placeholderTextColor="#999"
-            />
-          </View>
+
 
           {/* Durasi */}
           <View style={styles.fieldSpacing}>
