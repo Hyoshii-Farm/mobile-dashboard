@@ -14,6 +14,7 @@ import LogInPage from './screens/LogInPage';
 import Home from './screens/Home';
 import PesticideUsagePage from './screens/PesticideUsage';
 import FormPesticideUsage from './screens/FormPesticideUsage';
+import Reject from './screens/Reject'
 
 const Stack = createNativeStackNavigator();
 const navRef = createNavigationContainerRef();
@@ -45,6 +46,7 @@ const linking = {
     screens: {
       LogIn: 'login',
       Home: 'home',
+      Reject: 'Reject',
       PesticideUsage: 'hpt/pesticide-usage',
       FormPesticideUsage: 'hpt/pesticide-usage/new',
       // /callback and /logout handled by auth, not navigation routes
@@ -140,6 +142,7 @@ export default function App() {
           <Stack.Screen name="Home" component={Home} />
           <Stack.Screen name="PesticideUsage" component={PesticideUsagePage} />
           <Stack.Screen name="FormPesticideUsage" component={FormPesticideUsage} />
+          <Stack.Screen name="Reject" component={Reject} />
         </Stack.Navigator>
       </NavigationContainer>
     </KindeAuthProvider>
