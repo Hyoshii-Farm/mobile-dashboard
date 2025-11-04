@@ -14,6 +14,7 @@ import LogInPage from './screens/LogInPage';
 import Home from './screens/Home';
 import PesticideUsagePage from './screens/PesticideUsage';
 import FormPesticideUsage from './screens/FormPesticideUsage';
+import HamaPenyakitTanamanPage from './screens/HamaPenyakitTanaman';
 import MortalityPage from './screens/Mortality';
 import FormMortality from './screens/FormMortality';
 
@@ -49,6 +50,7 @@ const linking = {
       Home: 'home',
       PesticideUsage: 'hpt/pesticide-usage',
       FormPesticideUsage: 'hpt/pesticide-usage/new',
+      HamaPenyakitTanaman: 'hpt/monitoring',
       // /callback and /logout handled by auth, not navigation routes
     },
   },
@@ -131,6 +133,7 @@ export default function App() {
           <Stack.Screen name="Home" component={Home} />
           <Stack.Screen name="PesticideUsage" component={PesticideUsagePage} />
           <Stack.Screen name="FormPesticideUsage" component={FormPesticideUsage} />
+          <Stack.Screen name="HamaPenyakitTanaman" component={HamaPenyakitTanamanPage} />
           <Stack.Screen name="Mortality" component={MortalityPage} />
           <Stack.Screen name="FormMortality" component={FormMortality} />
         </Stack.Navigator>

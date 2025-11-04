@@ -168,7 +168,7 @@ export default function Home() {
           title="HPT"
           items={[
             { iconSvg: placeholderSvg, label: 'Pesticide Usage', onPress: () => navigation.navigate('PesticideUsage') },
-            { iconSvg: placeholderSvg, label: 'HPT GH', onPress: () => {} },
+            { iconSvg: placeholderSvg, label: 'HPT GH', onPress: () => navigation.navigate('HamaPenyakitTanaman') },
             { iconSvg: placeholderSvg, label: 'HPT Nursery', onPress: () => {} },
           ]}
         />
