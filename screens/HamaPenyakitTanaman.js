@@ -340,16 +340,22 @@ function HPTDataView({ authHeaders }) {
                   </View>
                   {pestNames.length > 0 && (
                     <View style={hptStyles.pestHeaderRow}>
-                      {pestNames.map((pestName) => (
-                        <Text 
-                          key={pestName} 
-                          style={hptStyles.pestHeaderText}
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                        >
-                          {pestName}
-                        </Text>
-                      ))}
+                      {pestNames.map((pestName) => {
+                        // Shorten "Mildew Insidensi" to "Mildew" and remove " Insidensi" suffix from any pest name
+                        const displayName = pestName?.endsWith(' Insidensi') 
+                          ? pestName.replace(' Insidensi', '')
+                          : pestName;
+                        return (
+                          <Text 
+                            key={pestName} 
+                            style={hptStyles.pestHeaderText}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            {displayName}
+                          </Text>
+                        );
+                      })}
                     </View>
                   )}
                 </View>
@@ -628,12 +634,13 @@ const hptStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: 20,
     alignItems: 'center',
+    justifyContent: 'flex-start',
   },
   pestHeaderText: {
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
-    minWidth: 50,
+    width: 70, // Fixed width for alignment
     color: '#8B5A3C', // Reddish-brown for all pest headers
   },
   // Location row
@@ -669,12 +676,13 @@ const hptStyles = StyleSheet.create({
     gap: 20,
     alignItems: 'center',
     flexShrink: 0,
+    justifyContent: 'flex-start',
   },
   pestScoreText: {
     fontSize: 14,
     color: '#1D4949', // Dark green
     textAlign: 'center',
-    minWidth: 50,
+    width: 70, // Fixed width to match header for alignment
     fontWeight: '500',
   },
   aphidsScore: {
