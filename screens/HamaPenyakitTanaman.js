@@ -21,6 +21,7 @@ function HPTDataView({ authHeaders }) {
   const [error, setError] = useState(null);
   const [expandedRows, setExpandedRows] = useState({});
   const [editModal, setEditModal] = useState({ visible: false, detail: null, pestName: '', locationName: '', dateEntry: null, value: '' });
+  const [pestNames, setPestNames] = useState([]);
 
   const fetchHPTData = useCallback(async (page = 1, pageSize = 10) => {
     if (!authHeaders) return;
@@ -48,8 +49,48 @@ function HPTDataView({ authHeaders }) {
     }
   }, [authHeaders]);
 
+  const fetchPestNames = useCallback(async () => {
+    if (!authHeaders) return;
+
+    try {
+      const url = `${API_BASE}/hama?ops=true&pest=true`;
+      const response = await fetch(url, { headers: authHeaders });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      const toLabel = (x) => {
+        if (!x) return null;
+        if (typeof x === 'string') return x;
+        return x?.name ?? x?.pest_name ?? x?.label ?? x?.title ?? (x?.id ? String(x.id) : null);
+      };
+
+      let items = [];
+      if (Array.isArray(result)) {
+        items = result;
+      } else if (Array.isArray(result?.data)) {
+        items = result.data;
+      } else if (Array.isArray(result?.items)) {
+        items = result.items;
+      } else if (Array.isArray(result?.results)) {
+        items = result.results;
+      }
+
+      const names = Array.from(new Set(items.map(toLabel).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+      setPestNames(names.length > 0 ? names : []);
+    } catch (err) {
+      console.error('[HPTDataView] Error fetching pest names:', err);
+      setPestNames([]);
+    }
+  }, [authHeaders]);
+
   useEffect(() => {
     if (authHeaders) {
+      fetchPestNames();
       fetchHPTData(pagination.page, pagination.pageSize);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,7 +138,6 @@ function HPTDataView({ authHeaders }) {
     }
 
     try {
-      // First, try to fetch the full record to get all required fields
       const getUrl = `${API_BASE}/hpt/${detail.id}`;
       
       let fullRecord = null;
@@ -110,8 +150,6 @@ function HPTDataView({ authHeaders }) {
         // Continue with partial data if fetch fails
       }
 
-      // Build request body with all required fields
-      // API requires all fields even though only plant_count can be changed
       const requestBody = {
         plant_count: parseInt(value, 10),
         pic: fullRecord?.pic || '',
@@ -197,7 +235,6 @@ function HPTDataView({ authHeaders }) {
                 throw new Error(errorMessage);
               }
 
-              // Immediately update local state to remove the deleted item for instant UI feedback
               setHptData(prevData => {
                 return prevData.map(dateEntry => ({
                   ...dateEntry,
@@ -249,42 +286,73 @@ function HPTDataView({ authHeaders }) {
     );
   }
 
-  // Get the three main pests for display (Aphids, Mildew, Siput)
   const getPestScore = (pests, pestName) => {
-    const pest = pests.find(p => p.pest_name === pestName || p.pest_name === `${pestName} Insidensi`);
+    const pest = pests.find(p => {
+      const name = p.pest_name;
+      return name === pestName || name === `${pestName} Insidensi` || name?.includes(pestName);
+    });
     return pest ? pest.total_score : 0;
   };
 
-  // Filter pests to only show Aphids, Mildew, and Siput in expanded view
   const getMainPests = (pests) => {
+    if (pestNames.length === 0) {
+      return [];
+    }
+
     return pests.filter(p => {
       const name = p.pest_name;
-      return name === 'Aphids' || name === 'Mildew' || name === 'Mildew Insidensi' || name === 'Siput';
-    }).map(p => ({
-      ...p,
-      displayName: p.pest_name === 'Mildew Insidensi' ? 'Mildew' : p.pest_name
-    }));
+      return pestNames.some(pestName => 
+        name === pestName || 
+        name === `${pestName} Insidensi` ||
+        name?.includes(pestName)
+      );
+    }).map(p => {
+      const displayName = p.pest_name?.endsWith(' Insidensi') 
+        ? p.pest_name.replace(' Insidensi', '')
+        : p.pest_name;
+      
+      return {
+        ...p,
+        displayName: displayName || p.pest_name
+      };
+    });
   };
 
   return (
     <>
-      <View style={hptStyles.tableContainer}>
-        {/* Date Sections */}
-        {hptData.map((dateEntry, dateIndex) => {
-          const formattedDate = formatDate(dateEntry.datetime);
-          const locations = dateEntry.locations || [];
-          
-          return (
-            <View key={dateIndex} style={hptStyles.dateSection}>
-              {/* Date Header Row */}
-              <View style={hptStyles.dateHeaderRow}>
-                <Text style={hptStyles.dateHeaderText}>{formattedDate}</Text>
-                <View style={hptStyles.pestHeaderRow}>
-                  <Text style={[hptStyles.pestHeaderText, hptStyles.aphidsHeader]}>Aphids</Text>
-                  <Text style={[hptStyles.pestHeaderText, hptStyles.mildewHeader]}>Mildew</Text>
-                  <Text style={[hptStyles.pestHeaderText, hptStyles.siputHeader]}>Siput</Text>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={true}
+        contentContainerStyle={hptStyles.horizontalScrollContent}
+      >
+        <View style={hptStyles.tableContainer}>
+          {/* Date Sections */}
+          {hptData.map((dateEntry, dateIndex) => {
+            const formattedDate = formatDate(dateEntry.datetime);
+            const locations = dateEntry.locations || [];
+            
+            return (
+              <View key={dateIndex} style={hptStyles.dateSection}>
+                {/* Date Header Row */}
+                <View style={hptStyles.dateHeaderRow}>
+                  <View style={hptStyles.dateHeaderLeft}>
+                    <Text style={hptStyles.dateHeaderText}>{formattedDate}</Text>
+                  </View>
+                  {pestNames.length > 0 && (
+                    <View style={hptStyles.pestHeaderRow}>
+                      {pestNames.map((pestName) => (
+                        <Text 
+                          key={pestName} 
+                          style={hptStyles.pestHeaderText}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {pestName}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
                 </View>
-              </View>
 
               {/* Location Rows */}
               {locations.map((location, locationIndex) => {
@@ -298,25 +366,34 @@ function HPTDataView({ authHeaders }) {
                       style={hptStyles.locationRow} 
                       onPress={() => toggleExpanded(rowKey)}
                     >
-                      <View style={hptStyles.expandCell}>
-                        <SvgXml 
-                          xml={isExpanded ? upArrowSvg : downArrowSvg} 
-                          width={12} 
-                          height={8} 
-                        />
-                      </View>
-                      <Text style={hptStyles.locationText}>{location.location_name}</Text>
-                      <View style={hptStyles.pestScoreRow}>
-                        <Text style={[hptStyles.pestScoreText, hptStyles.aphidsScore]}>
-                          {getPestScore(pests, 'Aphids')}
-                        </Text>
-                        <Text style={[hptStyles.pestScoreText, hptStyles.mildewScore]}>
-                          {getPestScore(pests, 'Mildew')}
-                        </Text>
-                        <Text style={[hptStyles.pestScoreText, hptStyles.siputScore]}>
-                          {getPestScore(pests, 'Siput')}
+                      <View style={hptStyles.locationLeft}>
+                        <View style={hptStyles.expandCell}>
+                          <SvgXml 
+                            xml={isExpanded ? upArrowSvg : downArrowSvg} 
+                            width={12} 
+                            height={8} 
+                          />
+                        </View>
+                        <Text style={hptStyles.locationText} numberOfLines={1} ellipsizeMode="tail">
+                          {location.location_name}
                         </Text>
                       </View>
+                      {pestNames.length > 0 && (
+                        <View style={hptStyles.pestScoreRow}>
+                          {pestNames.map((pestName, idx) => (
+                            <Text 
+                              key={pestName}
+                              style={[
+                                hptStyles.pestScoreText,
+                                idx === 0 && hptStyles.aphidsScore
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {getPestScore(pests, pestName)}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
                     </TouchableOpacity>
 
                     {/* Expanded Section */}
@@ -326,13 +403,13 @@ function HPTDataView({ authHeaders }) {
                           <View key={pest.pest_name} style={hptStyles.pestSection}>
                             <Text style={[
                               hptStyles.pestTitle,
-                              pest.displayName === 'Aphids' && hptStyles.aphidsTitle
+                              pestNames.length > 0 && pestNames[0] === pest.displayName && hptStyles.aphidsTitle
                             ]}>
                               {pest.displayName}
                             </Text>
                             
                             {/* Sample Details Table */}
-                            {pest.details && pest.details.length > 0 ? (
+                            {pest.details && pest.details.length > 0 && (
                               <View style={hptStyles.sampleTable}>
                                 <View style={hptStyles.sampleHeader}>
                                   <Text style={hptStyles.sampleHeaderText}>Sample No</Text>
@@ -340,9 +417,7 @@ function HPTDataView({ authHeaders }) {
                                   <View style={{ width: 80 }} />
                                 </View>
                                 
-                                {/* Sort details by score (ascending) to ensure consistent ordering */}
                                 {[...pest.details].sort((a, b) => (a.score || 0) - (b.score || 0)).map((detail, index) => {
-                                  // "Skor" uses the actual score value from database, sorted in ascending order
                                   const skorNumber = detail.score || (index + 1);
                                   
                                   return (
@@ -369,19 +444,6 @@ function HPTDataView({ authHeaders }) {
                                   );
                                 })}
                               </View>
-                            ) : (
-                              <View style={hptStyles.sampleTable}>
-                                <View style={hptStyles.sampleHeader}>
-                                  <Text style={hptStyles.sampleHeaderText}>Sample No</Text>
-                                  <Text style={hptStyles.sampleHeaderText}>Jumlah</Text>
-                                  <View style={{ width: 80 }} />
-                                </View>
-                                <View style={hptStyles.sampleRow}>
-                                  <Text style={hptStyles.sampleText}>-</Text>
-                                  <Text style={hptStyles.sampleText}>0</Text>
-                                  <View style={hptStyles.actionButtons} />
-                                </View>
-                              </View>
                             )}
                           </View>
                         ))}
@@ -393,7 +455,8 @@ function HPTDataView({ authHeaders }) {
             </View>
           );
         })}
-      </View>
+        </View>
+      </ScrollView>
 
       {/* Pagination - Separate from table container */}
       <View style={hptStyles.pagination}>
@@ -470,7 +533,6 @@ function HPTDataView({ authHeaders }) {
               value={editModal.value}
               onChangeText={(text) => setEditModal(prev => ({ ...prev, value: text.replace(/[^0-9]/g, '') }))}
               keyboardType="number-pad"
-              placeholder="Masukkan jumlah"
               autoFocus
             />
             <View style={hptStyles.modalButtons}>
@@ -522,6 +584,10 @@ const hptStyles = StyleSheet.create({
     color: '#FBF7EB',
     fontWeight: '600',
   },
+  // Horizontal scroll container
+  horizontalScrollContent: {
+    paddingBottom: 8,
+  },
   // Main table container - white card with reddish-brown border
   tableContainer: {
     backgroundColor: '#fff',
@@ -530,6 +596,7 @@ const hptStyles = StyleSheet.create({
     borderColor: '#8B5A3C', // Reddish-brown border
     overflow: 'hidden',
     marginTop: 16,
+    minWidth: '100%',
   },
   // Date section
   dateSection: {
@@ -546,6 +613,11 @@ const hptStyles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+    minWidth: 600, // Minimum width to ensure horizontal scroll
+  },
+  dateHeaderLeft: {
+    minWidth: 150,
+    marginRight: 16,
   },
   dateHeaderText: {
     fontSize: 14,
@@ -555,21 +627,14 @@ const hptStyles = StyleSheet.create({
   pestHeaderRow: {
     flexDirection: 'row',
     gap: 20,
+    alignItems: 'center',
   },
   pestHeaderText: {
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
     minWidth: 50,
-  },
-  aphidsHeader: {
-    color: '#8B5A3C', // Reddish-brown for Aphids
-  },
-  mildewHeader: {
-    color: '#1D4949', // Dark green for Mildew
-  },
-  siputHeader: {
-    color: '#1D4949', // Dark green for Siput
+    color: '#8B5A3C', // Reddish-brown for all pest headers
   },
   // Location row
   locationRow: {
@@ -580,6 +645,13 @@ const hptStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
     backgroundColor: '#fff',
+    minWidth: 600, // Minimum width to ensure horizontal scroll
+  },
+  locationLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 150,
+    marginRight: 16,
   },
   expandCell: {
     width: 24,
@@ -596,6 +668,7 @@ const hptStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: 20,
     alignItems: 'center',
+    flexShrink: 0,
   },
   pestScoreText: {
     fontSize: 14,
@@ -606,12 +679,6 @@ const hptStyles = StyleSheet.create({
   },
   aphidsScore: {
     color: '#8B5A3C', // Reddish-brown for Aphids score
-  },
-  mildewScore: {
-    color: '#1D4949', // Dark green
-  },
-  siputScore: {
-    color: '#1D4949', // Dark green
   },
   // Expanded section
   expandedSection: {
