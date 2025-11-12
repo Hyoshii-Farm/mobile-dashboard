@@ -15,6 +15,7 @@ import Home from './screens/Home';
 import PesticideUsagePage from './screens/PesticideUsage';
 import FormPesticideUsage from './screens/FormPesticideUsage';
 import HamaPenyakitTanamanPage from './screens/HamaPenyakitTanaman';
+import FormHamaPenyakit from './screens/FormHPT';
 import MortalityPage from './screens/Mortality';
 import FormMortality from './screens/FormMortality';
 
@@ -134,6 +135,7 @@ export default function App() {
           <Stack.Screen name="PesticideUsage" component={PesticideUsagePage} />
           <Stack.Screen name="FormPesticideUsage" component={FormPesticideUsage} />
           <Stack.Screen name="HamaPenyakitTanaman" component={HamaPenyakitTanamanPage} />
+          <Stack.Screen name="FormHamaPenyakit" component={FormHamaPenyakit} />
           <Stack.Screen name="Mortality" component={MortalityPage} />
           <Stack.Screen name="FormMortality" component={FormMortality} />
         </Stack.Navigator>

@@ -53,7 +53,13 @@ function HPTDataView({ authHeaders }) {
     if (!authHeaders) return;
 
     try {
-      const url = `${API_BASE}/hama?ops=true&pest=true`;
+      const baseUrl = `${API_BASE}/hama`;
+      const params = new URLSearchParams({
+        ops: 'true',
+        pest: 'true'
+      });
+      const url = `${baseUrl}?${params.toString()}`;
+      
       const response = await fetch(url, { headers: authHeaders });
 
       if (!response.ok) {
@@ -889,6 +895,8 @@ export default function HamaPenyakitTanamanPage() {
   const navigation = useNavigation();
   const { getAccessToken, isAuthenticated, login } = useKindeAuth();
 
+  // Local UI helpers
+
   const getAuthHeaders = useCallback(async () => {
     if (!isAuthenticated) {
       await login().catch((error) => {
@@ -933,7 +941,7 @@ export default function HamaPenyakitTanamanPage() {
     <View style={styles.container}>
         <StatusBarCustom backgroundColor="#1D4949" />
         <Header
-          title="Monitoring Hama Penyakit"
+          title="Hama Penyakit Tanaman"
           logoSvg={SVG_ICONS.backArrow}
           onLeftPress={() => navigation.navigate('Home')}
           showHomeButton={false}
