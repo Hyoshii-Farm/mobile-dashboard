@@ -15,6 +15,8 @@ import Home from './screens/Home';
 import PesticideUsagePage from './screens/PesticideUsage';
 import FormPesticideUsage from './screens/FormPesticideUsage';
 import Reject from './screens/Reject'
+import MortalityPage from './screens/Mortality';
+import FormMortality from './screens/FormMortality';
 
 const Stack = createNativeStackNavigator();
 const navRef = createNavigationContainerRef();
@@ -57,14 +59,9 @@ const linking = {
 export default function App() {
   // Global deep-link handler: catch /logout even if Home isn't mounted yet
   useEffect(() => {
-    console.log('[Env] appOwnership =', Constants.appOwnership);
-    console.log('[Auth] redirectUri:', redirectUri);
-    console.log('[Auth] logoutRedirectUri:', logoutRedirectUri);
-
     const handleUrl = ({ url }) => {
       const lower = (url || '').toLowerCase();
       if (lower.includes('logout')) {
-        console.log('[Auth] logout deep link received:', url);
         if (navRef.isReady()) {
           navRef.reset({ index: 0, routes: [{ name: 'LogIn' }] });
         } else {
@@ -79,7 +76,6 @@ export default function App() {
 
     Linking.getInitialURL().then((url) => {
       if (url) {
-        console.log('[Auth] initial URL:', url);
         handleUrl({ url });
       }
     });
@@ -103,7 +99,6 @@ export default function App() {
           try {
             return await SecureStore.getItemAsync(key);
           } catch (error) {
-            console.error('Storage getItem error:', error);
             return null;
           }
         },
@@ -111,28 +106,24 @@ export default function App() {
           try {
             await SecureStore.setItemAsync(key, value);
           } catch (error) {
-            console.error('Storage setItem error:', error);
+            // Silent fail for storage errors
           }
         },
         removeItem: async (key) => {
           try {
             await SecureStore.deleteItemAsync(key);
           } catch (error) {
-            console.error('Storage removeItem error:', error);
+            // Silent fail for storage errors
           }
         },
       }}
       callbacks={{
         onError: (error) => {
-          // Suppress signature verification errors during callback - they're false positives
-          // The tokens are actually valid and stored correctly
-          const errorMsg = error?.message || error?.toString() || '';
-          if (!errorMsg.includes('Signature verification failed')) {
-            console.error('Kinde error:', error);
-          }
+          // Silent error handling for production
+          // Signature verification errors are false positives during callback
         },
         onSuccess: () => {
-          console.log('Kinde auth successful');
+          // Silent success for production
         },
       }}
     >
@@ -143,6 +134,8 @@ export default function App() {
           <Stack.Screen name="PesticideUsage" component={PesticideUsagePage} />
           <Stack.Screen name="FormPesticideUsage" component={FormPesticideUsage} />
           <Stack.Screen name="Reject" component={Reject} />
+          <Stack.Screen name="Mortality" component={MortalityPage} />
+          <Stack.Screen name="FormMortality" component={FormMortality} />
         </Stack.Navigator>
       </NavigationContainer>
     </KindeAuthProvider>

@@ -94,15 +94,13 @@ export default function Home() {
         showHomeButton={false}
         onLeftPress={() => {}}
         profileContent={
-          <View pointerEvents="box-none">
-            <TouchableOpacity style={styles.avatar} onPress={() => setMenuVisible(true)}>
-              {profilePic ? (
-                <Image source={{ uri: profilePic }} style={styles.avatarImage} />
-              ) : (
-                <Text style={styles.avatarText}>{initials}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.avatar} onPress={() => setMenuVisible(true)}>
+            {profilePic ? (
+              <Image source={{ uri: profilePic }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>{initials}</Text>
+            )}
+          </TouchableOpacity>
         }
       />
 
@@ -112,32 +110,38 @@ export default function Home() {
         transparent
         onRequestClose={() => !isLoggingOut && setMenuVisible(false)}
       >
-       
+        {/* The Pressable now acts as the full-screen backdrop */}
         <Pressable
           style={styles.backdrop}
           onPress={() => {
             if (!isLoggingOut) setMenuVisible(false);
           }}
-        />
-        {/* Floating menu near the top-right (under the avatar) */}
-        <View style={styles.menuContainer} pointerEvents="box-none">
-          <View style={styles.menu}>
-            <TouchableOpacity
-              style={[styles.menuItem, isLoggingOut && styles.menuItemDisabled]}
-              onPress={handleLogout}
-              disabled={isLoggingOut}
-            >
-              {isLoggingOut ? (
-                <View style={styles.rowCenter}>
-                  <ActivityIndicator size="small" />
-                  <Text style={[styles.menuItemText, { marginLeft: 8 }]}>Logging out…</Text>
-                </View>
-              ) : (
-                <Text style={styles.menuItemText}>Logout</Text>
-              )}
-            </TouchableOpacity>
+        >
+          {/* This container positions the menu correctly */}
+          <View style={styles.menuContainer}>
+            {/* This inner Pressable stops touches on the menu from
+              propagating to the backdrop, so tapping the menu won't close it.
+            */}
+            <Pressable>
+              <View style={styles.menu}>
+                <TouchableOpacity
+                  style={[styles.menuItem, isLoggingOut && styles.menuItemDisabled]}
+                  onPress={handleLogout}
+                  disabled={isLoggingOut}
+                >
+                  {isLoggingOut ? (
+                    <View style={styles.rowCenter}>
+                      <ActivityIndicator size="small" />
+                      <Text style={[styles.menuItemText, { marginLeft: 8 }]}>Logging out…</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.menuItemText}>Logout</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </Pressable>
           </View>
-        </View>
+        </Pressable>
       </Modal>
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -190,7 +194,7 @@ export default function Home() {
             { iconSvg: placeholderSvg, label: 'Harvest', onPress: () => {} },
             { iconSvg: placeholderSvg, label: 'Reject GH', onPress: () => {} },
             { iconSvg: placeholderSvg, label: 'Forecast', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Mortality', onPress: () => {} },
+            { iconSvg: placeholderSvg, label: 'Mortality', onPress: () => navigation.navigate('Mortality') },
           ]}
         />
 
@@ -222,20 +226,17 @@ const styles = StyleSheet.create({
   avatarImage: { width: '100%', height: '100%', borderRadius: 18 },
   avatarText: { color: '#1D4949', fontWeight: 'bold' },
 
-
+  // Updated styles for the modal
   backdrop: {
     flex: 1,
-    backgroundColor: 'transparent', 
+    backgroundColor: 'rgba(0,0,0,0.1)', // Optional: a slight tint helps see the backdrop
   },
-
-  // Container that positions the popover menu at top-right-ish
   menuContainer: {
-    position: 'absolute',
-    top: 70,     
-    right: 16,
-    left: undefined,
+    // This now just aligns the menu to the top right of the backdrop
+    alignItems: 'flex-end',
+    paddingTop: 80, // Adjust to position menu vertically
+    paddingRight: 16,
   },
-
   menu: {
     backgroundColor: '#fff',
     borderRadius: 8,
@@ -248,6 +249,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 6,
   },
+  // End of updated styles
 
   menuItem: {
     paddingHorizontal: 16,
