@@ -1,19 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Animated,
+  TextInput,
+  StyleSheet,
+  Alert,
+  ScrollView,
+  ActivityIndicator,
+  Platform,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useCallback } from 'react';
 import { SvgXml } from 'react-native-svg';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import TambahForm from "../components/TambahForm";
-
-
-const hyoshiiLogo = `
-<svg viewBox="0 0 58 90" xmlns="http://www.w3.org/2000/svg">
-  <path d="M4 90C1.79 90 0 88.21 0 86V4C0 1.79 1.79 0 4 0H14C16.21 0 18 1.79 18 4V50L40 4C40.69 2.62 42.25 2 43.79 2C45.33 2 46.89 2.62 47.58 4L58 26.33C58.62 27.67 57.91 29.25 56.58 29.87C55.25 30.49 53.67 29.79 53.05 28.45L44 10.65L22 56V86C22 88.21 20.21 90 18 90H4Z" fill="#7A2929"/>
-</svg>
-`;
+import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import Constants from 'expo-constants';
+import { useKindeAuth } from '@kinde/expo';
+import StatusBarCustom from '../components/statusbar';
+import Header from '../components/Header';
 
 const COLORS = {
   cream: '#F0E6CB',
-  green: '#4A6C62',
+  green: '#1D4949',
   white: '#FFFFFF',
   brown: '#7A2929',
   brickRed: '#D3A3A3',
@@ -21,504 +32,1312 @@ const COLORS = {
   darkGray: '#4A4A4A',
 };
 
-const sampleData = {
-  pagination: { page: 1, pageSize: 10, total: 7784, totalPages: 779 },
-  data: [
-    {
-      datetime: "2025-09-19",
-      locations: [
-        {
-          location_name: "Green House 1",
-          quantity: 90,
-          reasons: [
-            { reason: "Ulat", quantity: 22 },
-            { reason: "Siput", quantity: 7 },
-            { reason: "Thrips", quantity: 5 }
-          ]
-        },
-        {
-          location_name: "Outdoor 1",
-          quantity: 31,
-          reasons: [
-            { reason: "Ulat", quantity: 10 },
-            { reason: "Siput", quantity: 2 }
-          ]
-        },
-        {
-          location_name: "Green House 2",
-          quantity: 12,
-          reasons: []
-        }
-      ]
-    },
-    // NEW DATE GROUP BELOW EXISTING DATA
-    {
-      datetime: "2025-09-18",
-      locations: [
-        {
-          location_name: "Green House 3",
-          quantity: 20,
-          reasons: [
-            { reason: "Siput", quantity: 5 },
-            { reason: "Thrips", quantity: 2 }
-          ]
-        },
-        {
-          location_name: "Outdoor 2",
-          quantity: 15,
-          reasons: [
-            { reason: "Ulat", quantity: 7 }
-          ]
-        }
-      ]
-    }
-  ]
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
+
+const backArrowSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="19" height="30" viewBox="0 0 19 30" fill="none"><path d="M15.4537 30L0.859123 15L15.4537 0L18.8591 3.5L7.66993 15L18.8591 26.5L15.4537 30Z" fill="#FBF7EB"/></svg>`;
+
+const downArrowSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M11.6087 1.5738L6.14086 7.04163L0.673035 1.5738L1.94886 0.297978L6.14086 4.48998L10.3329 0.297978L11.6087 1.5738Z" fill="black"/></svg>`;
+const upArrowSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M0.391304 6.46782L5.85914 0.999992L11.327 6.46782L10.0511 7.74364L5.85914 3.55164L1.66713 7.74364L0.391304 6.46782Z" fill="black"/></svg>`;
+const editIconSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 3C17.2626 2.73735 17.5744 2.52901 17.9176 2.38687C18.2608 2.24473 18.628 2.17157 19 2.17157C19.372 2.17157 19.7392 2.24473 20.0824 2.38687C20.4256 2.52901 20.7374 2.73735 21 3C21.2626 3.26265 21.471 3.57444 21.6131 3.9176C21.7553 4.26077 21.8284 4.62799 21.8284 5C21.8284 5.37201 21.7553 5.73923 21.6131 6.08239C21.471 6.42556 21.2626 6.73735 21 7L7.5 20.5L2 22L3.5 16.5L17 3Z" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const deleteIconSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 6H5H21" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const LOCATION_TO_ID = {
+  'Green House 1': 1,
+  'Green House 2': 2,
+  'Green House 3': 3,
+  'Green House 4': 4,
+  'Packing Area': 5,
+  Warehouse: 6,
+};
+const ID_TO_LOCATION = Object.fromEntries(Object.entries(LOCATION_TO_ID).map(([k, v]) => [String(v), k]));
+
+const REASON_TO_ID = {
+  ulat: 1,
+  siput: 2,
+};
+const ID_TO_REASON = Object.fromEntries(Object.entries(REASON_TO_ID).map(([k, v]) => [String(v), k]));
+
+/**
+ * Safe JSON parse helper
+ */
+const safeParseJson = (text) => {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
 };
 
-const Reject = () => {
-  const [data, setData] = useState([]);
-  const [expanded, setExpanded] = useState([]);// Track expanded location
-  const [page, setPage] = useState(1);
+export default function RejectPage() {
+  const navigation = useNavigation();
+  const { getAccessToken } = useKindeAuth();
+  const [authHeaders, setAuthHeaders] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    setData(sampleData.data);
-  }, []);
+    const initAuth = async () => {
+      try {
+        const audience = Constants?.expoConfig?.extra?.KINDE_AUDIENCE || process.env.EXPO_PUBLIC_KINDE_AUDIENCE;
+        if (audience) {
+          const token = await getAccessToken(audience);
+          if (token) {
+            setAuthHeaders({
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            });
+          }
+        }
+      } catch (e) {
+        // Silent fail - auth headers will remain null
+      }
+    };
+    initAuth();
+  }, [getAccessToken]);
 
-const toggleExpand = (dateIdx, locIdx) => {
-  const key = `${dateIdx}-${locIdx}`;
-  setExpanded(prev =>
-    prev.includes(key)
-      ? prev.filter(k => k !== key) // collapse
-      : [...prev, key] // expand new one
-  );
-};;
+  const handleEdit = (id) => {
+    setEditingId(id);
+  };
 
-  const AnimatedReasonDetail = ({ show, children }) => {
-  const [contentHeight, setContentHeight] = useState(0);
-  const animation = useRef(new Animated.Value(0)).current;
-        useEffect(() => {
-          Animated.timing(animation, {
-            toValue: show ? 1 : 0,
-            duration: 250,
-            useNativeDriver: false,
-          }).start();
-        }, [show]);
+  const handleDelete = async (id) => {
+    if (!id) return;
+    Alert.alert('Hapus', 'Yakin ingin menghapus entri ini?', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Hapus',
+        style: 'destructive',
+        onPress: async () => {
+          if (!API_BASE || !authHeaders) {
+            Alert.alert('Error', 'Gagal menghubung ke server.');
+            return;
+          }
+          try {
+            const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
+            const res = await fetch(url, { method: 'DELETE', headers: authHeaders });
+            const text = await res.text().catch(() => '');
+            if (!res.ok) throw new Error(`DELETE failed ${res.status}: ${text}`);
+            Alert.alert('Sukses', 'Data berhasil dihapus.');
+            setRefreshKey(prev => prev + 1);
+          } catch (e) {
+            console.error('handleDelete error', e);
+            Alert.alert('Error', 'Gagal menghubung ke server.');
+          }
+        },
+      },
+    ]);
+  };
 
-        const height = animation.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, contentHeight],
-        });
+  const handleSaved = () => {
+    setEditingId(null);
+    setRefreshKey(prev => prev + 1);
+  };
 
-        return (
-          <>
-            {/* Offscreen measurement */}
-            {contentHeight === 0 && (
-              <View
-                style={{ position: 'absolute', opacity: 0, left: -1000 }}
-                onLayout={(e) => setContentHeight(e.nativeEvent.layout.height)}
-              >
-                {children}
-              </View>
-            )}
-            
-            
-            {/* Animated container */}
-            <Animated.View
-              style={{
-                height,
-                opacity: animation,
-                overflow: 'hidden',
-              }}
-            >
-              
-              {contentHeight > 0 && children}
-            </Animated.View>
-          </>
-        );
-      };
-
-
-
-  const renderReason = (reasons) => (
-    <View style={styles.reasonDetail}>
-      <View style={styles.reasonHeader}>
-        <Text style={styles.reasonHeaderText}>Reason</Text>
-        <Text style={styles.reasonHeaderText}>Quantity</Text>
-        <Text style={styles.reasonHeaderText}>Menu</Text>
+  const handleDeleted = () => {
+    setEditingId(null);
+    setRefreshKey(prev => prev + 1);
+  };
+  
+  return (
+    <View style={{ flex: 1 }}>
+      <StatusBarCustom backgroundColor="#1D4949" />
+      <Header
+        title="REJECT BUDIDAYA"
+        logoSvg={backArrowSvg}
+        onLeftPress={() => navigation.goBack()}
+      />
+      <View style={{ flex: 1, backgroundColor: COLORS.cream }}>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={{ paddingBottom: 20 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <TambahForm 
+            editingId={editingId} 
+            onSaved={handleSaved}
+            onDeleted={handleDeleted}
+          />
+          <RejectDataView 
+            key={refreshKey}
+            authHeaders={authHeaders} 
+            onEdit={handleEdit} 
+            onDelete={handleDelete}
+            refreshTrigger={refreshKey}
+          />
+        </ScrollView>
       </View>
-      {reasons.length === 0 ? (
-        <Text style={styles.emptyReason}>No reasons</Text>
-      ) : (
-        reasons.map((r, idx) => (
-          <View key={idx} style={styles.reasonRow}>
-            <Text style={styles.reasonText}>{r.reason}</Text>
-            <Text style={styles.reasonQty}>{r.quantity}</Text>
-            <View style={styles.menuIcons}>
-              <Icon name="pencil" size={20} color={COLORS.green} style={{ marginRight: 12 }} />
-              <Icon name="trash-can-outline" size={20} color={COLORS.brickRed} />
-            </View>
-          </View>
-        ))
-      )}
     </View>
   );
+}
 
-  const renderLocation = (locations, dateIdx) => (
-    locations.map((loc, locIdx) => {
-      const isOpen = expanded.includes(`${dateIdx}-${locIdx}`);
-      return (
-        <View key={locIdx} style={styles.locationContainer}>
-          <TouchableOpacity
-            style={styles.locationRow}
-            onPress={() => toggleExpand(dateIdx, locIdx)}
-            activeOpacity={0.7}
-          >
-            <Icon
-              name={isOpen ? "chevron-up" : "chevron-down"}
-              size={22}
-              color={COLORS.green}
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.locationName}>{loc.location_name}</Text>
-            <Text style={styles.locationQty}>{loc.quantity} gr</Text>
-          </TouchableOpacity>
-          <AnimatedReasonDetail show={isOpen}>
-            {renderReason(loc.reasons)}
-          </AnimatedReasonDetail>
-        </View>
-      );
-    })
-  );
+function RejectDataView({ authHeaders, onEdit, onDelete, refreshTrigger }) {
+  const [rejectData, setRejectData] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [expandedRows, setExpandedRows] = useState({});
+  const [locations, setLocations] = useState([]);
+  const [hamaOptions, setHamaOptions] = useState([]);
 
-  const renderPagination = () => {
-    const totalPages = 3;
+  const fetchRejectData = useCallback(async (page = 1, pageSize = 10) => {
+    if (!authHeaders || !API_BASE) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const url = `${API_BASE}/ops/reject?page=${page}&pageSize=${pageSize}&sortBy=Datetime:desc`;
+      const response = await fetch(url, { headers: authHeaders });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      let data = [];
+      if (Array.isArray(result)) {
+        data = result;
+      } else if (Array.isArray(result?.data)) {
+        data = result.data;
+      } else if (Array.isArray(result?.items)) {
+        data = result.items;
+      } else if (Array.isArray(result?.results)) {
+        data = result.results;
+      }
+      
+      const groupedArray = data.map(item => ({
+        id: item.id || null,
+        date: item.datetime || 'Unknown',
+        datetime: item.datetime || '',
+        items: item.locations || []
+      }));
+
+      setRejectData(groupedArray);
+      setPagination(result.pagination || result.meta || { page, pageSize, total: data.length, totalPages: 1 });
+    } catch (err) {
+      console.error('[RejectDataView] Error fetching reject data:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [authHeaders]);
+
+  const fetchLocations = useCallback(async () => {
+    if (!authHeaders || !API_BASE) return;
+    try {
+      const url = `${API_BASE}/location`;
+      const res = await fetch(url, { headers: authHeaders });
+      if (!res.ok) return;
+      const data = await res.json();
+      const locationList = Array.isArray(data) ? data : (data?.data || []);
+      setLocations(locationList);
+    } catch (e) {
+      console.error('fetchLocations error', e);
+    }
+  }, [authHeaders]);
+
+  const fetchHamaOptions = useCallback(async () => {
+    if (!authHeaders || !API_BASE) return;
+    try {
+      const url = `${API_BASE}/hama`;
+      const res = await fetch(url, { headers: authHeaders });
+      if (!res.ok) return;
+      const data = await res.json();
+      const hamaList = Array.isArray(data) ? data : (data?.data || []);
+      setHamaOptions(hamaList);
+    } catch (e) {
+      console.error('fetchHamaOptions error', e);
+    }
+  }, [authHeaders]);
+
+  useEffect(() => {
+    if (authHeaders) {
+      fetchLocations();
+      fetchHamaOptions();
+      fetchRejectData(pagination.page, pagination.pageSize);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authHeaders, pagination.page, refreshTrigger]);
+
+  const toggleExpanded = (rowKey) => {
+    setExpandedRows(prev => ({
+      ...prev,
+      [rowKey]: !prev[rowKey]
+    }));
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    // Parse ISO date format like "2025-09-19"
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString; // Return original if invalid
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+  };
+
+  const getLocationName = (locationId) => {
+    const location = locations.find(loc => loc.id === locationId);
+    return location ? location.name : `Location ${locationId}`;
+  };
+
+  const getReasonName = (reasonId) => {
+    if (!reasonId) return null;
+    const hama = hamaOptions.find(h => h.id === reasonId);
+    return hama ? hama.name : null;
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      setPagination(prev => ({ ...prev, page: newPage }));
+    }
+  };
+
+  if (!authHeaders) {
     return (
-    <View style={styles.paginationContainer}>
-      {/* Left arrows */}
-      <TouchableOpacity
-        onPress={() => setPage(1)}
-        style={[styles.arrowButton, page === 1 && styles.arrowDisabled]}
-      >
-        <Icon name="chevron-double-left" size={24} color={page === 1 ? COLORS.gray : COLORS.green} />
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => setPage(page - 1)}
-        disabled={page === 1}
-        style={[styles.arrowButton, page === 1 && styles.arrowDisabled]}
-      >
-        <Icon name="chevron-left" size={24} color={page === 1 ? COLORS.gray : COLORS.green} />
-      </TouchableOpacity>
-
-
-      <View style={styles.squarePageButton}>
-        <Text style={styles.squarePageText}>{page}</Text>
+      <View style={rejectStyles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.green} />
+        <Text style={rejectStyles.loadingText}>Memuat...</Text>
       </View>
+    );
+  }
 
-      {/* Right arrows */}
-      <TouchableOpacity
-        onPress={() => setPage(page + 1)}
-        disabled={page === totalPages}
-        style={[styles.arrowButton, page === totalPages && styles.arrowDisabled]}
-      >
-        <Icon name="chevron-right" size={24} color={page === totalPages ? COLORS.gray : COLORS.green} />
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => setPage(totalPages)}
-        disabled={page === totalPages}
-        style={[styles.arrowButton, page === totalPages && styles.arrowDisabled]}
-      >
-        <Icon name="chevron-double-right" size={24} color={page === totalPages ? COLORS.gray : COLORS.green} />
-      </TouchableOpacity>
-    </View>
-  );
-};
+  if (loading && rejectData.length === 0) {
+    return (
+      <View style={rejectStyles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.green} />
+        <Text style={rejectStyles.loadingText}>Memuat data...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={rejectStyles.errorContainer}>
+        <Text style={rejectStyles.errorText}>Gagal mendapatkan data: {error}</Text>
+        <TouchableOpacity style={rejectStyles.retryButton} onPress={() => fetchRejectData(pagination.page, pagination.pageSize)}>
+          <Text style={rejectStyles.retryText}>Coba Lagi</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (rejectData.length === 0 && !loading) {
+    return (
+      <View style={rejectStyles.emptyContainer}>
+        <Text style={rejectStyles.emptyText}>Tidak ada data reject</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.screen}>
-      {/* Header */}
-      
-      <View style={styles.header}>
-        <Icon name="menu" size={28} color={COLORS.green} />
-        <SvgXml xml={hyoshiiLogo} width={80} height={40} />
-        <View style={styles.profileCircle}>
-          <Icon name="account" size={24} color={COLORS.green} />
-        </View>
-      </View>
-      <Text style={styles.title}>REJECT BUDIDAYA</Text>
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-      <TambahForm />
-   <View />
+    <View>
+      <View style={rejectStyles.tableContainer}>
+        {rejectData.map((dateGroup, dateIndex) => {
+            const formattedDate = formatDate(dateGroup.datetime);
+            const locationList = (dateGroup.items || []).map(location => {
+              const reasons = location.reasons || [];
+              
+              const mappedDetails = reasons.map(r => ({
+                id: r.id || null,
+                reject_id: dateGroup.id || r.id || null,
+                reason_id: r.reason_id || null,
+                reason: r.reason_name || r.reason || null,
+                quantity: Number(r.quantity) || 0
+              }));
+              
+              return {
+                location_id: location.location_id || null,
+                location_name: location.location_name || 'Unknown Location',
+                details: mappedDetails,
+                totalQuantity: Number(location.quantity) || 0
+              };
+            });
 
-    <View style={styles.contentBox}>
-      <View style={styles.tableHeader}>
-        <Text style={styles.tableHeaderText}>Location</Text>
-        <Text style={styles.tableHeaderText}>Quantity</Text>
-      </View>
+            return (
+              <View key={dateIndex} style={rejectStyles.dateSection}>
+                <View style={rejectStyles.dateHeaderContainer}>
+                  <Text style={rejectStyles.dateHeader}>{formattedDate}</Text>
+                </View>
+                
+                <View style={rejectStyles.tableHeader}>
+                  <Text style={rejectStyles.headerText}>Lokasi</Text>
+                  <Text style={rejectStyles.headerText}>Kuantitas</Text>
+                </View>
 
-      {data.map((item, dateIdx) => (
-        <View key={dateIdx} style={styles.dateGroup}>
-          <View style={styles.dateHeaderBox}>
-            <Text style={styles.dateText}>
-              {new Date(item.datetime).toLocaleDateString('id-ID', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
-            </Text>
-          </View>
-          {renderLocation(item.locations, dateIdx)}
-        </View>
-      ))}
+                {locationList.map((location, locIndex) => {
+                  const rowKey = `${dateIndex}-${locIndex}`;
+                  const isExpanded = expandedRows[rowKey];
+
+                  return (
+                    <View key={rowKey}>
+                      <TouchableOpacity 
+                        style={rejectStyles.locationRow} 
+                        onPress={() => toggleExpanded(rowKey)}
+                      >
+                        <View style={rejectStyles.locationLeft}>
+                          <SvgXml 
+                            xml={isExpanded ? upArrowSvg : downArrowSvg} 
+                            width={12} 
+                            height={8} 
+                          />
+                          <Text style={rejectStyles.locationText}>{location.location_name}</Text>
+                        </View>
+                        <Text style={rejectStyles.quantityText}>{location.totalQuantity} gr</Text>
+                      </TouchableOpacity>
+
+                      {isExpanded && location.details.length > 0 && (
+                        <View style={rejectStyles.expandedSection}>
+                          <View style={rejectStyles.detailsHeader}>
+                            <Text style={rejectStyles.detailsHeaderText}>Alasan</Text>
+                            <Text style={rejectStyles.detailsHeaderText}>Kuantitas</Text>
+                            <Text style={rejectStyles.detailsHeaderText}>Menu</Text>
+                          </View>
+                          {location.details.map((detail, detailIndex) => (
+                            <View key={detail.id || detailIndex} style={rejectStyles.detailRow}>
+                              <Text style={rejectStyles.detailText}>
+                                {(detail.reason && detail.reason !== 'null') 
+                                  ? detail.reason 
+                                  : (getReasonName(detail.reason_id) || 'Unknown')}
+                              </Text>
+                              <Text style={rejectStyles.detailText}>{detail.quantity || 0} gr</Text>
+                              <View style={rejectStyles.actionButtons}>
+                                <TouchableOpacity 
+                                  style={rejectStyles.actionButton}
+                                  onPress={() => {
+                                    const recordId = detail.reject_id || dateGroup.id || detail.id;
+                                    if (onEdit && recordId) {
+                                      onEdit(recordId);
+                                    }
+                                  }}
+                                >
+                                  <SvgXml xml={editIconSvg} width={16} height={16} />
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                  style={rejectStyles.actionButton}
+                                  onPress={() => {
+                                    const recordId = detail.reject_id || dateGroup.id || detail.id;
+                                    if (onDelete && recordId) {
+                                      onDelete(recordId);
+                                    }
+                                  }}
+                                >
+                                  <SvgXml xml={deleteIconSvg} width={16} height={16} />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          })}
+      </View>
+      <RejectPagination pagination={pagination} onPageChange={handlePageChange} />
     </View>
-  </ScrollView>
-
-  {renderPagination()}
-</View>
   );
-};
+}
 
-const styles = StyleSheet.create({
-  MainTable: {
-    backgroundColor: COLORS.gray,
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: COLORS.cream,
-    paddingTop: 32,
-  },
-  header: {
-    marginTop: 10,
-    paddingTop: 16,
-    flexDirection: 'row',
+function RejectPagination({ pagination, onPageChange }) {
+  if (pagination.totalPages <= 1) return null;
+
+  return (
+    <View style={rejectStyles.pagination}>
+      <TouchableOpacity 
+        style={rejectStyles.pageButton}
+        onPress={() => onPageChange(1)}
+        disabled={pagination.page === 1}
+      >
+        <Text style={[rejectStyles.pageButtonText, pagination.page === 1 && rejectStyles.pageButtonDisabled]}>
+          {"<<"}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={rejectStyles.pageButton}
+        onPress={() => onPageChange(pagination.page - 1)}
+        disabled={pagination.page === 1}
+      >
+        <Text style={[rejectStyles.pageButtonText, pagination.page === 1 && rejectStyles.pageButtonDisabled]}>
+          {"<"}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[rejectStyles.pageButton, rejectStyles.activePageButton]}>
+        <Text style={[rejectStyles.pageButtonText, rejectStyles.activePageText]}>
+          {pagination.page}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={rejectStyles.pageButton}
+        onPress={() => onPageChange(pagination.page + 1)}
+        disabled={pagination.page >= pagination.totalPages}
+      >
+        <Text style={[rejectStyles.pageButtonText, pagination.page >= pagination.totalPages && rejectStyles.pageButtonDisabled]}>
+          {">"}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={rejectStyles.pageButton}
+        onPress={() => onPageChange(pagination.totalPages)}
+        disabled={pagination.page >= pagination.totalPages}
+      >
+        <Text style={[rejectStyles.pageButtonText, pagination.page >= pagination.totalPages && rejectStyles.pageButtonDisabled]}>
+          {">>"}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {} }) {
+  const [showForm, setShowForm] = useState(false);
+  const formAnimation = useRef(new Animated.Value(0)).current;
+  const [loading, setLoading] = useState(false);
+  const [totalReject, setTotalReject] = useState('');
+  const [tanggal, setTanggal] = useState('');
+  const [lokasi, setLokasi] = useState('');
+  const [daftarRejects, setDaftarRejects] = useState([]);
+  const LOCATION_OPTIONS = Object.keys(LOCATION_TO_ID);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateObj, setDateObj] = useState(null);
+  const [editingRecordType, setEditingRecordType] = useState(null);
+
+  useEffect(() => {
+    const total = daftarRejects.reduce((sum, item) => sum + (Number(item.kuantitas) || 0), 0);
+    setTotalReject(String(total));
+  }, [daftarRejects]);
+
+  useEffect(() => {
+    if (editingId) {
+      setShowForm(true);
+      fetchRecord(editingId);
+    } else if (!dateObj) {
+      const today = new Date();
+      setDateObj(today);
+      setTanggal(formatDate(today));
+    }
+  }, [editingId]);
+
+  useEffect(() => {
+    Animated.timing(formAnimation, {
+      toValue: showForm ? 1 : 0,
+      duration: 330,
+      useNativeDriver: false,
+    }).start();
+  }, [showForm, formAnimation]);
+
+  useEffect(() => {
+    if (dateObj) setTanggal(formatDate(dateObj));
+  }, [dateObj]);
+
+  function formatDate(d) {
+    if (!d) return '';
+    const months = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  const { getAccessToken } = useKindeAuth();
+
+  const makeHeaders = async () => {
+    const headers = { 'Content-Type': 'application/json' };
+    try {
+      const audience =
+        Constants?.expoConfig?.extra?.KINDE_AUDIENCE || process.env.EXPO_PUBLIC_KINDE_AUDIENCE;
+      if (!audience) {
+        return headers;
+      }
+      let token = null;
+      try {
+        if (typeof getAccessToken === 'function') {
+          token = await getAccessToken(audience);
+        }
+      } catch (e) {
+        // Silent fail - continue without token
+      }
+
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (e) {
+      // Silent fail - return headers without auth
+    }
+    return headers;
+  };
+
+  function buildPayloadForApi(isUpdate = false) {
+    const location_id = LOCATION_TO_ID[lokasi] ?? null;
+    const datetime = dateObj ? dateObj.toISOString() : null;
+
+    const details = (daftarRejects || [])
+      .filter((d) => d.jenis && d.jenis.trim() !== '' && REASON_TO_ID[d.jenis.trim().toLowerCase()])
+      .map((d) => ({
+        reason_id: REASON_TO_ID[d.jenis.trim().toLowerCase()],
+        quantity: Number(d.kuantitas) || 0,
+      }));
+
+    if (isUpdate && editingRecordType === 'single' && details.length === 1) {
+      const jenisName = daftarRejects.find(d => d.jenis && d.jenis.trim() !== '')?.jenis || '';
+      return {
+        reason_name: jenisName.toLowerCase(),
+        quantity: details[0].quantity,
+      };
+    }
+
+    return {
+      location_id,
+      datetime,
+      details,
+    };
+  }
+
+  function populateFormFromRecord(record) {
+    const details = record.details || [];
+    const total = details.reduce((sum, d) => sum + (Number(d.quantity) || 0), 0);
+    setTotalReject(String(total));
+    
+    if (record.datetime) {
+      const parsed = new Date(record.datetime);
+      if (!isNaN(parsed.getTime())) {
+        setDateObj(parsed);
+        setTanggal(formatDate(parsed));
+      } else {
+        setDateObj(null);
+        setTanggal(String(record.datetime));
+      }
+    } else {
+      setDateObj(null);
+      setTanggal('');
+    }
+
+    const locName = record.location_id ? ID_TO_LOCATION[String(record.location_id)] : null;
+    setLokasi(locName ?? '');
+    
+    const mappedRejects = details.map((d, i) => {
+      let jenis = '';
+      if (d.reason_id) {
+        jenis = ID_TO_REASON[String(d.reason_id)] ?? '';
+      }
+      if (!jenis && d.reason) {
+        jenis = d.reason;
+      }
+      return {
+        id: d.id ?? `${Date.now()}-${i}`,
+        jenis: jenis,
+        kuantitas: String(d.quantity ?? 0),
+      };
+    });
+    setDaftarRejects(mappedRejects);
+  }
+
+  function resetForm() {
+    setTotalReject('');
+    setTanggal('');
+    setLokasi('');
+    setDaftarRejects([]);
+    setDateObj(null);
+    setEditingRecordType(null);
+  }
+
+  function addJenis(jenis = '', kuantitas = '') {
+    setDaftarRejects((prev) => [...prev, { id: `${Date.now()}-${Math.random()}`, jenis, kuantitas: String(kuantitas) }]);
+  }
+  function removeJenis(id) {
+    setDaftarRejects((prev) => prev.filter((p) => p.id !== id));
+  }
+  function updateJenis(id, field, value) {
+    setDaftarRejects((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+  }
+
+  // --- network operations ---
+  async function fetchRecord(id) {
+    if (!id) return;
+    if (!API_BASE) {
+      Alert.alert('Error', 'Gagal mendapatkan data.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const headers = await makeHeaders();
+      const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
+      const res = await fetch(url, { method: 'GET', headers });
+      const text = await res.text().catch(() => '');
+      if (!res.ok) {
+        throw new Error(`GET failed: ${res.status} ${text}`);
+      }
+      const data = safeParseJson(text) ?? null;
+      
+      let record = data;
+      
+      if (data && data.locations && Array.isArray(data.locations) && data.locations.length > 0) {
+        const firstLocation = data.locations[0];
+        record = {
+          id: data.id,
+          datetime: data.datetime,
+          location_id: firstLocation.location_id || null,
+          location_name: firstLocation.location_name || null,
+          details: (firstLocation.reasons || []).map(r => ({
+            id: r.id || null,
+            reason_id: r.reason_id || null,
+            reason: r.reason_name || r.reason || null,
+            quantity: Number(r.quantity) || 0
+          }))
+        };
+      } else if (Array.isArray(data)) {
+        record = data.find((r) => String(r.id) === String(id)) || data[0] || null;
+      } else if (data && data.id && data.reason_id !== undefined) {
+        setEditingRecordType('single');
+        record = {
+          id: data.id,
+          datetime: data.datetime,
+          location_id: data.location_id || null,
+          details: [{
+            id: data.id,
+            reason_id: data.reason_id || null,
+            reason: data.reason?.name || null,
+            quantity: Number(data.quantity) || 0
+          }]
+        };
+      } else if (data && data.locations) {
+        setEditingRecordType('grouped');
+      }
+      
+      if (record) {
+        populateFormFromRecord(record);
+      } else {
+        Alert.alert('Info', 'Data untuk diedit tidak ditemukan.');
+      }
+    } catch (e) {
+      console.error('fetchRecord error', e);
+      Alert.alert('Error', 'Gagal mendapatkan data.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createRecord() {
+    if (!API_BASE) {
+      Alert.alert('Error', 'Gagal mendapatkan data.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const payload = buildPayloadForApi();
+      const url = `${API_BASE}/ops/reject`;
+      const headers = await makeHeaders();
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const text = await res.text().catch(() => '');
+      if (!res.ok) {
+        throw new Error(`POST failed ${res.status}: ${text}`);
+      }
+      const data = safeParseJson(text) ?? null;
+      onSaved(data);
+      resetForm();
+      setShowForm(false);
+      return data;
+    } catch (e) {
+      console.error('createRecord error', e);
+      Alert.alert('Error', 'Gagal mendapatkan data.');
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateRecord(id) {
+    if (!id) throw new Error('Missing id for update');
+    if (!API_BASE) {
+      Alert.alert('Error', 'Gagal mendapatkan data.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const payload = buildPayloadForApi(true);
+      const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
+      const headers = await makeHeaders();
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text().catch(() => '');
+
+      if (!res.ok) throw new Error(`PUT failed ${res.status}: ${text}`);
+      const data = safeParseJson(text) ?? null;
+      Alert.alert('Sukses', 'Data berhasil diperbarui.');
+      onSaved(data);
+      resetForm();
+      setShowForm(false);
+      setEditingRecordType(null);
+      return data;
+    } catch (e) {
+      console.error('updateRecord error', e);
+      Alert.alert('Error', 'Gagal mendapatkan data.');
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteRecord(id) {
+    if (!id) return;
+    Alert.alert('Hapus', 'Yakin ingin menghapus entri ini?', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Hapus',
+        style: 'destructive',
+        onPress: async () => {
+          if (!API_BASE) {
+            Alert.alert('Error', 'Gagal menghubung ke server.');
+            return;
+          }
+          setLoading(true);
+          try {
+            const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
+            const headers = await makeHeaders();
+            const res = await fetch(url, { method: 'DELETE', headers });
+            const text = await res.text().catch(() => '');
+            if (!res.ok) throw new Error(`DELETE failed ${res.status}: ${text}`);
+            Alert.alert('Sukses', 'Data berhasil dihapus.');
+            onDeleted(id);
+            resetForm();
+            setShowForm(false);
+          } catch (e) {
+            console.error('deleteRecord error', e);
+            Alert.alert('Error', 'Gagal menghubung ke server.');
+          } finally {
+            setLoading(false);
+          }
+        },
+      },
+    ]);
+  }
+
+  function onChangeDate(event, selectedDate) {
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    const eventType = event && event.type ? event.type : null;
+    if (eventType === 'dismissed') return;
+
+    let chosenDate = selectedDate;
+    if (!chosenDate && event && event.nativeEvent && event.nativeEvent.timestamp) {
+      chosenDate = new Date(event.nativeEvent.timestamp);
+    }
+    if (!chosenDate) return;
+    setDateObj(chosenDate);
+    setTanggal(formatDate(chosenDate));
+  }
+
+  async function handleSave() {
+    const invalid = daftarRejects.some((d) => !d.jenis || Number(d.kuantitas) <= 0);
+    if (invalid) {
+      Alert.alert('Error', 'Pastikan semua jenis terisi dan kuantitas lebih dari 0 gram');
+      return;
+    }
+    const payload = buildPayloadForApi();
+    if (!payload.location_id) {
+      Alert.alert('Validasi', 'Pilih lokasi yang valid.');
+      return;
+    }
+    if (!payload.datetime) {
+      Alert.alert('Validasi', 'Tanggal wajib dipilih.');
+      return;
+    }
+    if (!payload.details || payload.details.length === 0) {
+      Alert.alert('Validasi', 'Tambahkan minimal satu alasan dan kuantitas.');
+      return;
+    }
+
+    try {
+      if (editingId) {
+        await updateRecord(editingId);
+      } else {
+        await createRecord();
+      }
+    } catch (e) {
+      // Error handling is done in createRecord/updateRecord
+    }
+  }
+
+
+  return (
+    <View>
+        {/* Tambah Button */}
+        <TouchableOpacity style={styles.addButton} onPress={() => setShowForm((v) => !v)}>
+          <Text style={styles.addButtonText}>{showForm ? 'Tutup' : '+ Tambah'}</Text>
+        </TouchableOpacity>
+
+        {/* Animated Form Section */}
+        {showForm && (
+          <Animated.View style={{ opacity: formAnimation, overflow: 'visible', marginHorizontal: 16, marginTop: 10 }}>
+            <View style={styles.formPanel}>
+              {/* Loading overlay */}
+              {loading && (
+                <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.6)' }}>
+                  <ActivityIndicator size="large" color={COLORS.green} />
+                </View>
+              )}
+
+              {/* Form Content */}
+              <View style={styles.formRow}>
+                <Text style={styles.formLabel}>Total Reject</Text>
+                <View style={styles.formInputWrapper}>
+                  <TextInput 
+                    style={[styles.formInput, { backgroundColor: COLORS.gray }]} 
+                    value={totalReject} 
+                    editable={false}
+                    placeholder="0" 
+                  />
+                  <Text style={styles.formUnit}>gram</Text>
+                </View>
+              </View>
+
+              {/* Tanggal */}
+              <View style={styles.formRow}>
+                <Text style={styles.formLabel}>Tanggal*</Text>
+                <View style={styles.formInputRow}>
+                  <TouchableOpacity style={[styles.formInput, { justifyContent: 'center' }]} onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
+                    <Text style={{ color: tanggal ? '#000' : '#888' }}>{tanggal || 'Pilih tanggal'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.formIconTouchable}>
+                    <Icon name="calendar" size={22} color={COLORS.green} />
+                  </TouchableOpacity>
+                </View>
+
+                {showDatePicker && (
+                  <DateTimePicker value={dateObj || new Date()} mode="date" display="calendar" onChange={onChangeDate} maximumDate={new Date(2100, 11, 31)} minimumDate={new Date(2000, 0, 1)} />
+                )}
+              </View>
+
+              {/* Lokasi */}
+              <View style={styles.formRow}>
+                <Text style={styles.formLabel}>Lokasi*</Text>
+                <View style={{ borderWidth: 1, borderColor: COLORS.green, borderRadius: 4, overflow: 'hidden' }}>
+                  <Picker selectedValue={lokasi} onValueChange={(itemValue) => setLokasi(itemValue)} mode="dropdown" style={{ height: 48 }}>
+                    <Picker.Item label="Pilih lokasi..." value="" />
+                    {LOCATION_OPTIONS.map((loc) => (
+                      <Picker.Item key={loc} label={loc} value={loc} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+
+              <View style={styles.separator} />
+
+              {/* Daftar Reject Section */}
+              <Text style={styles.subFormTitle}>DAFTAR REJECT</Text>
+              <View style={styles.subFormHeader}>
+                <Text style={[styles.subFormLabel, { marginLeft: 1 }]}>Jenis</Text>
+                <Text style={styles.subFormLabel}>Kuantitas (gram)</Text>
+              </View>
+
+              {daftarRejects.map((item) => (
+                <View key={item.id} style={styles.subFormRow}>
+                  <View style={styles.dropdown}>
+                    <TextInput 
+                      placeholder="Jenis (contoh: Ulat)" 
+                      style={styles.dropdownText} 
+                      value={item.jenis} 
+                      onChangeText={(text) => updateJenis(item.id, 'jenis', text)} 
+                    />
+                    <TouchableOpacity onPress={() => removeJenis(item.id)}>
+                      <Icon name="close" size={16} color={COLORS.green} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.quantityInputRow}>
+                    <TextInput 
+                      placeholder="Kuantitas (gram)" 
+                      style={styles.quantityInput} 
+                      keyboardType="numeric" 
+                      value={String(item.kuantitas)} 
+                      onChangeText={(text) => updateJenis(item.id, 'kuantitas', text.replace(/[^0-9]/g, ''))} 
+                    />
+                  </View>
+                </View>
+              ))}
+
+              <TouchableOpacity style={styles.addJenisButton} onPress={() => addJenis('', '')}>
+                <Text style={styles.addJenisButtonText}>+ Jenis Lain</Text>
+              </TouchableOpacity>
+
+              {/* Action Buttons */}
+              <View style={styles.actionButtonsRow}>
+                <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
+                  <Text style={styles.saveButtonText}>{editingId ? 'Perbarui' : 'Simpan'}</Text>
+                </TouchableOpacity>
+
+                {editingId ? (
+                  <TouchableOpacity style={styles.resetButton} onPress={() => deleteRecord(editingId)} disabled={loading}>
+                    <Text style={styles.resetButtonText}>Hapus</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={styles.resetButton} onPress={() => resetForm()} disabled={loading}>
+                    <Text style={styles.resetButtonText}>Reset</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </Animated.View>
+        )}
+    </View>
+  );
+}
+
+const rejectStyles = StyleSheet.create({
+  loadingContainer: {
+    padding: 20,
     alignItems: 'center',
-    paddingHorizontal: 16,
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
+  errorContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#dc2626',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  retryButton: {
+    backgroundColor: COLORS.green,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     paddingBottom: 8,
-    backgroundColor: COLORS.cream,
-    justifyContent: 'space-between',
   },
-  logo: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1D4949',
-    fontFamily: 'sans-serif-medium',
-    letterSpacing: 1,
-  },
-  profileCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.white,
+  emptyContainer: {
+    padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.gray,
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    marginTop: 8,
-  },
-  title: {
-    fontSize: 28,
-    paddingTop: 12,
-    fontWeight: 'bold',
-    alignSelf: 'center',
+  emptyText: {
+    fontSize: 16,
     color: COLORS.darkGray,
-    letterSpacing: 1,
+    textAlign: 'center',
   },
-  contentBox: {
-    backgroundColor: COLORS.white,
-    padding: 12,
-    borderEndColor: COLORS.brown,
-    borderWidth: 1.5,
+  tableContainer: {
+    backgroundColor: COLORS.cream,
+    borderWidth: 1,
+    borderColor: COLORS.brickRed,
     marginHorizontal: 16,
-    marginTop: 0,
-    marginBottom: 1,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
- 
+    marginTop: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  dateSection: {
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.brickRed,
+  },
+  dateHeaderContainer: {
+    backgroundColor: COLORS.gray,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  dateHeader: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.green,
   },
   tableHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingVertical: 8,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 10,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray,
   },
-  tableHeaderText: {
+  headerText: {
+    fontSize: 14,
     fontWeight: 'bold',
     color: COLORS.darkGray,
-    fontSize: 15,
-  },
-  listContainer: {
-    marginHorizontal: 8,
-    marginBottom: 10,
-    maxHeight:390,
-  },
-  arrowButton: {
-  width: 36,
-  height: 36,
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginHorizontal: 2,
-  backgroundColor: COLORS.white,
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: COLORS.gray,
-},
-arrowDisabled: {
-  opacity: 0.5,
-},
-squarePageButton: {
-  width: 40,
-  height: 40,
-  backgroundColor: COLORS.green,
-  borderRadius: 8,
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginHorizontal: 8,
-},
-squarePageText: {
-  color: COLORS.white,
-  fontWeight: 'bold',
-  fontSize: 18,
-},
-  dateGroup: {
-    marginBottom: 18,
-  },
-  dateHeaderBox: {
-    backgroundColor: COLORS.gray,
-    paddingVertical: 7,
-    width: 330,
-    paddingHorizontal: 12,
-    marginBottom: 6,
-    marginHorizontal: 0,
-  },
-  dateText: {
-    color: COLORS.green,
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  locationContainer: {
-    marginBottom: 8,
-    backgroundColor: COLORS.white,
-    overflow: 'hidden',
-    marginHorizontal: 0,
-    elevation: 1,
+    flex: 1,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 12,
-    paddingHorizontal: 12,
-  },
-  locationName: {
-    flex: 1,
-    fontSize: 15,
-    color: COLORS.darkGray,
-  },
-  locationQty: {
-    fontWeight: 'bold',
-    fontSize: 15,
-    color: COLORS.darkGray,
-    marginLeft: 8,
-  },
-  expandIcon: {
-    fontSize: 16,
-    color: COLORS.green,
-    marginLeft: 8,
-  },
-  reasonDetail: {
-    borderWidth: 1,
-    borderColor: COLORS.brickRed,
-    borderRadius: 8,
-    marginHorizontal: 8,
-    marginBottom: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray,
     backgroundColor: COLORS.white,
-    padding: 8,
-    marginTop: 4,
+    minHeight: 44,
   },
-  reasonHeader: {
+  locationLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  locationText: {
+    fontSize: 14,
+    color: COLORS.green,
+    flex: 1,
+  },
+  quantityText: {
+    fontSize: 14,
+    color: COLORS.darkGray,
+    fontWeight: '500',
+  },
+  expandedSection: {
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  detailsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderColor: COLORS.brickRed,
-    paddingBottom: 4,
-    marginBottom: 6,
-  },
-  reasonHeaderText: {
-    flex: 1,
-    fontWeight: 'bold',
-    color: COLORS.brickRed,
-    fontSize: 14,
-    textAlign: 'left',
-  },
-  reasonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  reasonText: {
-    flex: 1,
-    fontSize: 14,
-    color: COLORS.darkGray,
-  },
-  reasonQty: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.darkGray,
-    textAlign: 'left',
-  },
-  menuIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  emptyReason: {
-    color: COLORS.darkGray,
-    fontStyle: 'italic',
-    fontSize: 13,
     paddingVertical: 8,
-    textAlign: 'center',
+    paddingHorizontal: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray,
+    marginBottom: 8,
   },
-  paginationContainer: {
+  detailsHeaderText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.darkGray,
+    flex: 1,
+    textAlign: 'left',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray,
+    minHeight: 40,
+  },
+  detailText: {
+    fontSize: 12,
+    color: COLORS.darkGray,
+    flex: 1,
+    textAlign: 'left',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    minWidth: 60,
+  },
+  actionButton: {
+    padding: 4,
+  },
+  pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 12,
-    backgroundColor: COLORS.cream,
+    paddingVertical: 16,
+    paddingTop: 20,
+    backgroundColor: 'transparent',
+    gap: 8,
+    marginTop: 16,
   },
   pageButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: COLORS.green,
-    marginHorizontal: 4,
+    borderColor: '#d1d5db',
+    minWidth: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
   },
-  pageButtonActive: {
+  pageButtonText: {
+    fontSize: 12,
+    color: COLORS.green,
+    fontWeight: '500',
+  },
+  pageButtonDisabled: {
+    color: '#9ca3af',
+    opacity: 0.5,
+  },
+  activePageButton: {
     backgroundColor: COLORS.green,
     borderColor: COLORS.green,
   },
-  pageButtonText: {
-    color: COLORS.green,
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  pageButtonTextActive: {
+  activePageText: {
     color: COLORS.white,
   },
 });
 
-export default Reject;
+const styles = StyleSheet.create({
+  addButton: {
+    backgroundColor: COLORS.green,
+    alignSelf: 'center',
+    width: 100,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  addButtonText: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  formPanel: {
+    padding: 16,
+  },
+  formTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.green,
+    textAlign: 'center',
+    letterSpacing: 2,
+    marginBottom: 14,
+    textTransform: 'uppercase',
+  },
+  formRow: {
+    marginBottom: 12,
+  },
+  formLabel: {
+    fontWeight: 'bold',
+    color: COLORS.green,
+    marginBottom: 4,
+  },
+  formInputWrapper: {
+    position: 'relative',
+  },
+  formInputRow: {
+    position: 'relative',
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: COLORS.green,
+    padding: 8,
+    fontSize: 15,
+    paddingRight: 40,
+  },
+  formUnit: {
+    position: 'absolute',
+    right: 10,
+    top: '50%',
+    transform: [{ translateY: -7 }],
+    color: COLORS.darkGray,
+  },
+  formIcon: {
+    position: 'absolute',
+    right: 10,
+    top: '50%',
+    transform: [{ translateY: -11 }],
+  },
+  subFormTitle: {
+    fontWeight: 'bold',
+    color: COLORS.green,
+    marginTop: 2,
+    marginBottom: 8,
+    fontSize: 20,
+    textTransform: 'uppercase',
+  },
+  formIconTouchable: {
+    position: 'absolute',
+    right: 5,
+    top: '30%',
+    transform: [{ translateY: -11 }],
+    padding: 6,
+  },
+  separator: {
+    height: 2,
+    backgroundColor: COLORS.green,
+    marginVertical: 12,
+  },
+  subFormHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4, marginRight: -28 },
+  subFormLabel: { fontWeight: 'bold', color: COLORS.darkGray, fontSize: 14, flex: 9 },
+  subFormRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  dropdown: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: COLORS.darkGray,
+    padding: 8,
+    marginRight: 8,
+  },
+  dropdownText: { flex: 1, color: COLORS.darkGray, fontSize: 15, padding: 0 },
+  quantityInputRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  quantityInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.darkGray,
+    padding: 8,
+    fontSize: 15,
+    textAlign: 'left',
+  },
+  stepper: {
+    position: 'absolute',
+    right: 8,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addJenisButton: {
+    backgroundColor: COLORS.green,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  addJenisButtonText: { color: COLORS.white, fontWeight: 'bold', fontSize: 14 },
+  actionButtonsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  saveButton: {
+    flex: 1,
+    backgroundColor: COLORS.green,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  saveButtonText: { color: COLORS.white, fontWeight: 'bold', fontSize: 16 },
+  resetButton: {
+    flex: 1,
+    backgroundColor: COLORS.brown,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  resetButtonText: { color: COLORS.white, fontWeight: 'bold', fontSize: 16 },
+});

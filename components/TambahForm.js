@@ -14,7 +14,6 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { useKindeAuth } from '@kinde/expo';
 
@@ -28,48 +27,42 @@ const COLORS = {
   darkGray: '#4A4A4A',
 };
 
-const API_BASE =
-  Constants.expoConfig?.extra?.API_BASE ||
-  process.env.EXPO_PUBLIC_API_BASE ||
-  'https://staging.rinal.dev/api/v1';
-const API_TOKEN =
- process.env.EXPO_PUBLIC_API_TOKEN ;
-
-const LOCATION_TO_ID = {
-  'Green House 1': 1,
-  'Green House 2': 2,
-  'Green House 3': 3,
-  'Green House 4': 4,
-  'Packing Area': 5,
-  Warehouse: 6,
-};
-const ID_TO_LOCATION = Object.fromEntries(Object.entries(LOCATION_TO_ID).map(([k, v]) => [String(v), k]));
-
-const REASON_TO_ID = {
-  ulat: 1,
-  Siput: 2,
-
-};
-const ID_TO_REASON = Object.fromEntries(Object.entries(REASON_TO_ID).map(([k, v]) => [String(v), k]));
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
 
 export default function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {} }) {
   const [showForm, setShowForm] = useState(false);
   const formAnimation = useRef(new Animated.Value(0)).current;
   const [loading, setLoading] = useState(false);
-  const [totalReject, setTotalReject] = useState('');
   const [tanggal, setTanggal] = useState('');
   const [lokasi, setLokasi] = useState(''); 
+  const [lokasiId, setLokasiId] = useState(null);
   const [daftarRejects, setDaftarRejects] = useState([]); 
-  const LOCATION_OPTIONS = Object.keys(LOCATION_TO_ID);
+  const [locations, setLocations] = useState([]);
+  const [hamaOptions, setHamaOptions] = useState([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateObj, setDateObj] = useState(null);
 
   useEffect(() => {
+    if (!editingId && !dateObj) {
+      const today = new Date();
+      setDateObj(today);
+      setTanggal(formatDate(today));
+    }
     if (editingId) {
       setShowForm(true);
       fetchRecord(editingId);
     }
   }, [editingId]);
+
+  useEffect(() => {
+    fetchLocations();
+    fetchHamaOptions();
+  }, []);
+
+  const totalReject = daftarRejects.reduce((sum, item) => {
+    const qty = Number(item.kuantitas) || 0;
+    return sum + qty;
+  }, 0);
 
   useEffect(() => {
     Animated.timing(formAnimation, {
@@ -102,59 +95,75 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
     return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   }
 
-  const formHeight = formAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 450],
-  });
-
   const { getAccessToken } = useKindeAuth();
   const makeHeaders = async () => {
-  const headers = { 'Content-Type': 'application/json' };
-  try {
-    const audience = Constants.expoConfig.extra?.KINDE_AUDIENCE || process.env.EXPO_PUBLIC_KINDE_AUDIENCE;
+    const headers = { 'Content-Type': 'application/json' };
+    try {
+      const audience = Constants.expoConfig.extra?.KINDE_AUDIENCE || process.env.EXPO_PUBLIC_KINDE_AUDIENCE;
 
-    if (!audience) {
-      console.warn('makeHeaders: KINDE audience is not defined');
-      return headers;
+      if (!audience) {
+        return headers;
+      }
+
+      const token = await getAccessToken(audience);
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    } catch (e) {
+      // Silent fail - return headers without auth
     }
 
-    const token = await getAccessToken(audience);
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-  } catch (e) {
-    console.warn('makeHeaders: failed to get token from Kinde', e);
-  }
-
-  return headers;
-};
-
-  function buildPayloadForApi() {
-  const location_id = LOCATION_TO_ID[lokasi] ?? null;
-  const datetime = dateObj ? dateObj.toISOString() : null;
-  const normalizedReasons = Object.fromEntries(
-    Object.entries(REASON_TO_ID).map(([key, value]) => [key.toLowerCase(), value])
-  );
-
-  const details = (daftarRejects || [])
-    .filter(d => d.jenis && d.jenis.trim() !== '' && REASON_TO_ID[d.jenis.trim().toLowerCase()])
-    .map(d => ({
-      reason_id: REASON_TO_ID[d.jenis.trim().toLowerCase()],
-      quantity: Number(d.kuantitas) || 0,
-    }));
-
-  const payload = {
-    location_id,
-    datetime,
-    details,
+    return headers;
   };
 
-  console.log("Payload being sent to API:", JSON.stringify(payload, null, 2));
-  return payload;
-}
+  async function fetchLocations() {
+    if (!API_BASE) return;
+    try {
+      const headers = await makeHeaders();
+      const url = `${API_BASE}/location`;
+      const res = await fetch(url, { method: 'GET', headers });
+      if (!res.ok) throw new Error(`GET failed: ${res.status}`);
+      const data = await res.json();
+      const locationList = Array.isArray(data) ? data : (data?.data || []);
+      setLocations(locationList);
+    } catch (e) {
+      console.error('fetchLocations error', e);
+    }
+  }
+
+  async function fetchHamaOptions() {
+    if (!API_BASE) return;
+    try {
+      const headers = await makeHeaders();
+      const url = `${API_BASE}/hama`;
+      const res = await fetch(url, { method: 'GET', headers });
+      if (!res.ok) throw new Error(`GET failed: ${res.status}`);
+      const data = await res.json();
+      const hamaList = Array.isArray(data) ? data : (data?.data || []);
+      setHamaOptions(hamaList);
+    } catch (e) {
+      console.error('fetchHamaOptions error', e);
+    }
+  }
+
+  function buildPayloadForApi() {
+    const datetime = dateObj ? dateObj.toISOString() : null;
+
+    const details = (daftarRejects || [])
+      .filter(d => d.jenis_id && Number(d.kuantitas) > 0)
+      .map(d => ({
+        reason_id: d.jenis_id,
+        quantity: Number(d.kuantitas) || 0,
+      }));
+
+    return {
+      location_id: lokasiId,
+      datetime,
+      details,
+    };
+  }
 
   function populateFormFromRecord(record) {
-       setTotalReject(''); 
     if (record.datetime) {
       const parsed = new Date(record.datetime);
       if (!isNaN(parsed.getTime())) {
@@ -169,27 +178,39 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
       setTanggal('');
     }
 
-    const locName = record.location_id ? ID_TO_LOCATION[String(record.location_id)] : null;
-    setLokasi(locName ?? '');
+    setLokasiId(record.location_id || null);
+    const location = locations.find(loc => loc.id === record.location_id);
+    setLokasi(location ? location.name : '');
+    
     setDaftarRejects(
-      (record.details || []).map((d, i) => ({
-        id: d.id ?? `${Date.now()}-${i}`,
-        jenis: ID_TO_REASON[String(d.reason_id)] ?? '',
+      (record.details || []).map((d) => ({
+        id: d.id,
+        jenis_id: d.reason_id,
+        jenis: hamaOptions.find(h => h.id === d.reason_id)?.name || '',
         kuantitas: String(d.quantity ?? 0),
       }))
     );
   }
 
   function resetForm() {
-    setTotalReject('');
     setTanggal('');
     setLokasi('');
+    setLokasiId(null);
     setDaftarRejects([]);
     setDateObj(null);
+    const today = new Date();
+    setDateObj(today);
+    setTanggal(formatDate(today));
   }
 
-  function addJenis(jenis = '', kuantitas = '') {
-    setDaftarRejects(prev => [...prev, { id: `${Date.now()}-${Math.random()}`, jenis, kuantitas: String(kuantitas) }]);
+  function addJenis(jenisId = null, kuantitas = '') {
+    if (!jenisId) return;
+    setDaftarRejects(prev => [...prev, { 
+      id: `temp-${Date.now()}-${Math.random()}`, 
+      jenis_id: jenisId,
+      jenis: hamaOptions.find(h => h.id === jenisId)?.name || '',
+      kuantitas: String(kuantitas) 
+    }]);
   }
   function removeJenis(id) {
     setDaftarRejects(prev => prev.filter(p => p.id !== id));
@@ -201,16 +222,19 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
 
   async function fetchRecord(id) {
     if (!id) return;
+    if (!API_BASE) {
+      Alert.alert('Error', 'Gagal menghubung ke server.');
+      return;
+    }
     setLoading(true);
     try {
       const headers = await makeHeaders();
-        const url = `${API_BASE}/ops/reject?org_code=org_b56b8313086&page=1&sortBy=Datetime:desc&id=${encodeURIComponent(
-        id
-      )}`;
+      const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
       
       const res = await fetch(url, { method: 'GET', headers });
       if (!res.ok) throw new Error(`GET failed: ${res.status}`);
-      const data = await res.json();
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
 
       let record = data;
       if (Array.isArray(data)) {
@@ -221,21 +245,22 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
       else Alert.alert('Info', 'Data untuk diedit tidak ditemukan.');
     } catch (e) {
       console.error('fetchRecord error', e);
-      Alert.alert('Error', 'Gagal memuat data dari server.');
+      Alert.alert('Error', 'Gagal menghubung ke server.');
     } finally {
       setLoading(false);
     }
   }
 
   async function createRecord() {
+    if (!API_BASE) {
+      Alert.alert('Error', 'Gagal menghubung ke server.');
+      return;
+    }
     setLoading(true);
     try {
       const payload = buildPayloadForApi();
-      console.log('Payload being sent:', JSON.stringify(payload, null, 2));
       const url = `${API_BASE}/ops/reject`;
       const headers = await makeHeaders();
-      console.log('createRecord -> POST', url, 'headers=', headers, 'payload=', payload);
-      console.log('Payload to POST:', payload);
       const res = await fetch(url, {
         method: 'POST',
         headers,
@@ -243,7 +268,6 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
       });
 
       const text = await res.text();
-      console.log('createRecord response', res.status, text);
       if (!res.ok) {
         throw new Error(`POST failed ${res.status}: ${text}`);
       }
@@ -254,7 +278,7 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
       return data;
     } catch (e) {
       console.error('createRecord error', e);
-      Alert.alert('Error', 'Gagal menyimpan data ke server.');
+      Alert.alert('Error', 'Gagal menghubung ke server.');
       throw e;
     } finally {
       setLoading(false);
@@ -263,19 +287,21 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
 
   async function updateRecord(id) {
     if (!id) throw new Error('Missing id for update');
+    if (!API_BASE) {
+      Alert.alert('Error', 'Gagal menghubung ke server.');
+      return;
+    }
     setLoading(true);
     try {
       const payload = buildPayloadForApi();
-      const url = `$${API_BASE}/ops/reject/${id}`;
+      const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
       const headers = await makeHeaders();
-      console.log('updateRecord -> PUT', url, 'headers=', headers, 'payload=', payload);
       const res = await fetch(url, {
         method: 'PUT',
         headers,
         body: JSON.stringify(payload),
       });
       const text = await res.text();
-      console.log('updateRecord response', res.status, text);
 
       if (!res.ok) throw new Error(`PUT failed ${res.status}: ${text}`);
       const data = text ? JSON.parse(text) : null;
@@ -285,7 +311,7 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
       return data;
     } catch (e) {
       console.error('updateRecord error', e);
-      Alert.alert('Error', 'Gagal memperbarui data di server.');
+      Alert.alert('Error', 'Gagal menghubung ke server.');
       throw e;
     } finally {
       setLoading(false);
@@ -300,6 +326,10 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
         text: 'Hapus',
         style: 'destructive',
         onPress: async () => {
+          if (!API_BASE) {
+            Alert.alert('Error', 'Gagal menghubung ke server.');
+            return;
+          }
           setLoading(true);
           try {
             const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
@@ -312,7 +342,7 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
             setShowForm(false);
           } catch (e) {
             console.error('deleteRecord error', e);
-            Alert.alert('Error', 'Gagal menghapus data di server.');
+            Alert.alert('Error', 'Gagal menghubung ke server.');
           } finally {
             setLoading(false);
           }
@@ -338,10 +368,10 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
 
   async function handleSave() {
     const invalid = daftarRejects.some(
-      d => !d.jenis || Number(d.kuantitas) <= 0
+      d => !d.jenis_id || Number(d.kuantitas) <= 0
     );
     if (invalid) {
-      Alert.alert('Error', 'Pastikan semua jenis terisi dan kuantitas lebih dari  0 gram');
+      Alert.alert('Error', 'Pastikan semua jenis terisi dan kuantitas lebih dari 0 gram');
       return;
     }
     const payload = buildPayloadForApi();
@@ -365,7 +395,7 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
         await createRecord();
       }
     } catch (e) {
-
+      // Error handling is done in createRecord/updateRecord
     }
   }
 
@@ -422,10 +452,9 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
                   <Text style={styles.formLabel}>Total Reject</Text>
                   <View style={styles.formInputWrapper}>
                     <TextInput
-                      style={styles.formInput}
-                      value={totalReject}
-                      keyboardType="numeric"
-                      onChangeText={setTotalReject}
+                      style={[styles.formInput, { backgroundColor: COLORS.gray }]}
+                      value={String(totalReject)}
+                      editable={false}
                       placeholder="0"
                     />
                     <Text style={styles.formUnit}>gram</Text>
@@ -477,14 +506,18 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
                     }}
                   >
                     <Picker
-                      selectedValue={lokasi}
-                      onValueChange={(itemValue) => setLokasi(itemValue)}
+                      selectedValue={lokasiId}
+                      onValueChange={(itemValue) => {
+                        const location = locations.find(loc => loc.id === itemValue);
+                        setLokasiId(itemValue);
+                        setLokasi(location ? location.name : '');
+                      }}
                       mode="dropdown"
                       style={{ height: 48 }}
                     >
-                      <Picker.Item label="Pilih lokasi..." value="" />
-                      {LOCATION_OPTIONS.map(loc => (
-                        <Picker.Item key={loc} label={loc} value={loc} />
+                      <Picker.Item label="Pilih lokasi..." value={null} />
+                      {locations.map(loc => (
+                        <Picker.Item key={loc.id} label={loc.name} value={loc.id} />
                       ))}
                     </Picker>
                   </View>
@@ -499,40 +532,28 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
                   <Text style={styles.subFormLabel}>Kuantitas (gram)</Text>
                 </View>
 
-                {/* If no reject items yet */}
-                {daftarRejects.length === 0 && (
-                  <View style={styles.subFormRow}>
-                    <View style={styles.dropdown}>
-                      <TextInput
-                        placeholder="Jenis (contoh: Ulat)"
-                        style={styles.dropdownText}
-                        value=""
-                        onChangeText={text => addJenis(text, '')}
-                      />
-                    </View>
-                    <View style={styles.quantityInputRow}>
-                      <TextInput
-                        placeholder="Kuantitas (gram)"
-                        style={styles.quantityInput}
-                        keyboardType="numeric"
-                        value=""
-                        onChangeText={text => addJenis('', text)}
-                      />
-                    </View>
-                  </View>
-                )}
-
                 {/* Render daftarRejects */}
                 {daftarRejects.map(item => (
                   <View key={item.id} style={styles.subFormRow}>
                     <View style={styles.dropdown}>
-                      <TextInput
-                        placeholder="Jenis (contoh: Ulat)"
-                        style={styles.dropdownText}
-                        value={item.jenis}
-                        onChangeText={text => updateJenis(item.id, 'jenis', text)}
-                      />
-                      <TouchableOpacity onPress={() => removeJenis(item.id)}>
+                      <View style={{ flex: 1, borderWidth: 1, borderColor: COLORS.darkGray, borderRadius: 4, overflow: 'hidden' }}>
+                        <Picker
+                          selectedValue={item.jenis_id}
+                          onValueChange={(itemValue) => {
+                            const hama = hamaOptions.find(h => h.id === itemValue);
+                            updateJenis(item.id, 'jenis_id', itemValue);
+                            updateJenis(item.id, 'jenis', hama ? hama.name : '');
+                          }}
+                          mode="dropdown"
+                          style={{ height: 40 }}
+                        >
+                          <Picker.Item label="Pilih jenis..." value={null} />
+                          {hamaOptions.map(hama => (
+                            <Picker.Item key={hama.id} label={hama.name} value={hama.id} />
+                          ))}
+                        </Picker>
+                      </View>
+                      <TouchableOpacity onPress={() => removeJenis(item.id)} style={{ marginLeft: 8 }}>
                         <Icon name="close" size={16} color={COLORS.green} />
                       </TouchableOpacity>
                     </View>
@@ -543,7 +564,10 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
                         style={styles.quantityInput}
                         keyboardType="numeric"
                         value={String(item.kuantitas)}
-                        onChangeText={text => updateJenis(item.id, 'kuantitas', text)}
+                        onChangeText={(text) => {
+                          const numericValue = text.replace(/[^0-9]/g, '');
+                          updateJenis(item.id, 'kuantitas', numericValue);
+                        }}
                       />
                     </View>
                   </View>
@@ -551,7 +575,11 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
 
                 <TouchableOpacity
                   style={styles.addJenisButton}
-                  onPress={() => addJenis('', '')}
+                  onPress={() => {
+                    if (hamaOptions.length > 0) {
+                      addJenis(hamaOptions[0].id, '');
+                    }
+                  }}
                 >
                   <Text style={styles.addJenisButtonText}>+ Jenis Lain</Text>
                 </TouchableOpacity>
@@ -579,10 +607,7 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
                   ) : (
                     <TouchableOpacity
                       style={styles.resetButton}
-                      onPress={() => {
-                        resetForm();
-                        setShowForm(false);
-                      }}
+                      onPress={() => resetForm()}
                       disabled={loading}
                     >
                       <Text style={styles.resetButtonText}>Reset</Text>
