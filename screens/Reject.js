@@ -502,11 +502,14 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
   const [totalReject, setTotalReject] = useState('');
   const [tanggal, setTanggal] = useState('');
   const [lokasi, setLokasi] = useState('');
+  const [lokasiId, setLokasiId] = useState(null);
   const [daftarRejects, setDaftarRejects] = useState([]);
-  const LOCATION_OPTIONS = Object.keys(LOCATION_TO_ID);
+  const [locations, setLocations] = useState([]);
+  const [rejectReasons, setRejectReasons] = useState([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateObj, setDateObj] = useState(null);
   const [editingRecordType, setEditingRecordType] = useState(null);
+  const [needsRepopulate, setNeedsRepopulate] = useState(false);
 
   useEffect(() => {
     const total = daftarRejects.reduce((sum, item) => sum + (Number(item.kuantitas) || 0), 0);
@@ -514,15 +517,48 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
   }, [daftarRejects]);
 
   useEffect(() => {
+    fetchLocations();
+    fetchRejectReasons();
+  }, []);
+
+  // Initialize with one empty jenis field when form opens and rejectReasons are loaded (only for new forms, not editing)
+  useEffect(() => {
+    if (!editingId && rejectReasons.length > 0 && daftarRejects.length === 0 && showForm) {
+      // Add one initial jenis field
+      const reason = rejectReasons[0];
+      if (reason) {
+        setDaftarRejects([{ 
+          id: `initial-${Date.now()}`, 
+          reason_id: reason.id,
+          jenis: reason.name || reason.label || '',
+          kuantitas: '' 
+        }]);
+      }
+    }
+  }, [rejectReasons.length, editingId, showForm]);
+
+  useEffect(() => {
     if (editingId) {
       setShowForm(true);
+      setNeedsRepopulate(false);
       fetchRecord(editingId);
-    } else if (!dateObj) {
+    } else if (!editingId && showForm && !dateObj) {
+      // Default to today when opening form for new entry
       const today = new Date();
       setDateObj(today);
       setTanggal(formatDate(today));
+      setNeedsRepopulate(false);
     }
-  }, [editingId]);
+  }, [editingId, showForm]);
+
+  // Repopulate form when locations or rejectReasons are loaded during edit
+  useEffect(() => {
+    if (editingId && needsRepopulate && locations.length > 0 && rejectReasons.length > 0) {
+      // Re-fetch record to populate with proper location and reason names
+      fetchRecord(editingId);
+      setNeedsRepopulate(false);
+    }
+  }, [editingId, needsRepopulate, locations.length, rejectReasons.length]);
 
   useEffect(() => {
     Animated.timing(formAnimation, {
@@ -583,27 +619,56 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     return headers;
   };
 
+  async function fetchLocations() {
+    if (!API_BASE) return;
+    try {
+      const headers = await makeHeaders();
+      const url = `${API_BASE}/location/dropdown?search&concise=true&nursery=false`;
+      const res = await fetch(url, { method: 'GET', headers });
+      if (!res.ok) throw new Error(`GET failed: ${res.status}`);
+      const data = await res.json();
+      const locationList = Array.isArray(data) ? data : (data?.data || data?.items || []);
+      setLocations(locationList);
+    } catch (e) {
+      console.error('fetchLocations error', e);
+    }
+  }
+
+  async function fetchRejectReasons() {
+    if (!API_BASE) return;
+    try {
+      const headers = await makeHeaders();
+      const url = `${API_BASE}/reject-reason`;
+      const res = await fetch(url, { method: 'GET', headers });
+      if (!res.ok) throw new Error(`GET failed: ${res.status}`);
+      const data = await res.json();
+      const reasonList = Array.isArray(data) ? data : (data?.data || data?.items || []);
+      setRejectReasons(reasonList);
+    } catch (e) {
+      console.error('fetchRejectReasons error', e);
+    }
+  }
+
   function buildPayloadForApi(isUpdate = false) {
-    const location_id = LOCATION_TO_ID[lokasi] ?? null;
     const datetime = dateObj ? dateObj.toISOString() : null;
 
     const details = (daftarRejects || [])
-      .filter((d) => d.jenis && d.jenis.trim() !== '' && REASON_TO_ID[d.jenis.trim().toLowerCase()])
+      .filter((d) => d.reason_id && Number(d.kuantitas) > 0)
       .map((d) => ({
-        reason_id: REASON_TO_ID[d.jenis.trim().toLowerCase()],
+        reason_id: d.reason_id,
         quantity: Number(d.kuantitas) || 0,
       }));
 
     if (isUpdate && editingRecordType === 'single' && details.length === 1) {
-      const jenisName = daftarRejects.find(d => d.jenis && d.jenis.trim() !== '')?.jenis || '';
+      const reason = rejectReasons.find(r => r.id === details[0].reason_id);
       return {
-        reason_name: jenisName.toLowerCase(),
+        reason_name: reason?.name || '',
         quantity: details[0].quantity,
       };
     }
 
     return {
-      location_id,
+      location_id: lokasiId,
       datetime,
       details,
     };
@@ -628,20 +693,24 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
       setTanggal('');
     }
 
-    const locName = record.location_id ? ID_TO_LOCATION[String(record.location_id)] : null;
-    setLokasi(locName ?? '');
+    setLokasiId(record.location_id || null);
+    const location = locations.find(loc => loc.id === record.location_id);
+    setLokasi(location ? location.name : '');
+    
+    // Check if we need to repopulate when locations/rejectReasons load
+    if (record.location_id && !location) {
+      setNeedsRepopulate(true);
+    }
     
     const mappedRejects = details.map((d, i) => {
-      let jenis = '';
-      if (d.reason_id) {
-        jenis = ID_TO_REASON[String(d.reason_id)] ?? '';
-      }
-      if (!jenis && d.reason) {
-        jenis = d.reason;
+      const reason = rejectReasons.find(r => r.id === d.reason_id);
+      if (d.reason_id && !reason) {
+        setNeedsRepopulate(true);
       }
       return {
         id: d.id ?? `${Date.now()}-${i}`,
-        jenis: jenis,
+        reason_id: d.reason_id || null,
+        jenis: reason ? reason.name : (d.reason || ''),
         kuantitas: String(d.quantity ?? 0),
       };
     });
@@ -652,19 +721,60 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     setTotalReject('');
     setTanggal('');
     setLokasi('');
+    setLokasiId(null);
     setDaftarRejects([]);
     setDateObj(null);
     setEditingRecordType(null);
+    setNeedsRepopulate(false);
+    const today = new Date();
+    setDateObj(today);
+    setTanggal(formatDate(today));
+    
+    // Add one initial jenis field after reset if rejectReasons are available
+    if (rejectReasons.length > 0 && !editingId) {
+      const reason = rejectReasons[0];
+      setDaftarRejects([{ 
+        id: `initial-${Date.now()}`, 
+        reason_id: reason.id,
+        jenis: reason.name || reason.label || '',
+        kuantitas: '' 
+      }]);
+    }
   }
 
-  function addJenis(jenis = '', kuantitas = '') {
-    setDaftarRejects((prev) => [...prev, { id: `${Date.now()}-${Math.random()}`, jenis, kuantitas: String(kuantitas) }]);
+  function addJenis(reasonId = null, kuantitas = '') {
+    if (!reasonId && rejectReasons.length > 0) {
+      reasonId = rejectReasons[0].id;
+    }
+    if (reasonId) {
+      const reason = rejectReasons.find(r => r.id === reasonId);
+      setDaftarRejects((prev) => [...prev, { 
+        id: `${Date.now()}-${Math.random()}`, 
+        reason_id: reasonId,
+        jenis: reason ? reason.name : '',
+        kuantitas: String(kuantitas) 
+      }]);
+    }
   }
   function removeJenis(id) {
     setDaftarRejects((prev) => prev.filter((p) => p.id !== id));
   }
   function updateJenis(id, field, value) {
-    setDaftarRejects((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+    setDaftarRejects((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id === id) {
+          const newItem = { ...p, [field]: value };
+          // If reason_id changed, update jenis name
+          if (field === 'reason_id') {
+            const reason = rejectReasons.find(r => r.id === value);
+            newItem.jenis = reason ? reason.name : '';
+          }
+          return newItem;
+        }
+        return p;
+      });
+      return updated;
+    });
   }
 
   // --- network operations ---
@@ -851,7 +961,7 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
   }
 
   async function handleSave() {
-    const invalid = daftarRejects.some((d) => !d.jenis || Number(d.kuantitas) <= 0);
+    const invalid = daftarRejects.some((d) => !d.reason_id || Number(d.kuantitas) <= 0);
     if (invalid) {
       Alert.alert('Error', 'Pastikan semua jenis terisi dan kuantitas lebih dari 0 gram');
       return;
@@ -885,7 +995,16 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
   return (
     <View>
         {/* Tambah Button */}
-        <TouchableOpacity style={styles.addButton} onPress={() => setShowForm((v) => !v)}>
+        <TouchableOpacity style={styles.addButton} onPress={() => {
+          const newShowForm = !showForm;
+          setShowForm(newShowForm);
+          // When opening form for new entry (not editing), ensure date defaults to today
+          if (newShowForm && !editingId) {
+            const today = new Date();
+            setDateObj(today);
+            setTanggal(formatDate(today));
+          }
+        }}>
           <Text style={styles.addButtonText}>{showForm ? 'Tutup' : '+ Tambah'}</Text>
         </TouchableOpacity>
 
@@ -935,10 +1054,19 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
               <View style={styles.formRow}>
                 <Text style={styles.formLabel}>Lokasi*</Text>
                 <View style={{ borderWidth: 1, borderColor: COLORS.green, borderRadius: 4, overflow: 'hidden' }}>
-                  <Picker selectedValue={lokasi} onValueChange={(itemValue) => setLokasi(itemValue)} mode="dropdown" style={{ height: 48 }}>
-                    <Picker.Item label="Pilih lokasi..." value="" />
-                    {LOCATION_OPTIONS.map((loc) => (
-                      <Picker.Item key={loc} label={loc} value={loc} />
+                  <Picker
+                    selectedValue={lokasiId}
+                    onValueChange={(itemValue) => {
+                      const location = locations.find(loc => loc.id === itemValue);
+                      setLokasiId(itemValue);
+                      setLokasi(location ? location.name : '');
+                    }}
+                    mode="dropdown"
+                    style={{ height: 48 }}
+                  >
+                    <Picker.Item label="Pilih lokasi..." value={null} />
+                    {locations.map((loc) => (
+                      <Picker.Item key={loc.id} label={loc.name || loc.label || String(loc)} value={loc.id} />
                     ))}
                   </Picker>
                 </View>
@@ -956,13 +1084,22 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
               {daftarRejects.map((item) => (
                 <View key={item.id} style={styles.subFormRow}>
                   <View style={styles.dropdown}>
-                    <TextInput 
-                      placeholder="Jenis (contoh: Ulat)" 
-                      style={styles.dropdownText} 
-                      value={item.jenis} 
-                      onChangeText={(text) => updateJenis(item.id, 'jenis', text)} 
-                    />
-                    <TouchableOpacity onPress={() => removeJenis(item.id)}>
+                    <View style={{ flex: 1, borderWidth: 1, borderColor: COLORS.darkGray, borderRadius: 4, overflow: 'hidden' }}>
+                      <Picker
+                        selectedValue={item.reason_id}
+                        onValueChange={(itemValue) => {
+                          updateJenis(item.id, 'reason_id', itemValue);
+                        }}
+                        mode="dropdown"
+                        style={{ height: 40 }}
+                      >
+                        <Picker.Item label="Pilih jenis..." value={null} />
+                        {rejectReasons.map((reason) => (
+                          <Picker.Item key={reason.id} label={reason.name || reason.label || String(reason)} value={reason.id} />
+                        ))}
+                      </Picker>
+                    </View>
+                    <TouchableOpacity onPress={() => removeJenis(item.id)} style={{ marginLeft: 8 }}>
                       <Icon name="close" size={16} color={COLORS.green} />
                     </TouchableOpacity>
                   </View>
@@ -979,7 +1116,14 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
                 </View>
               ))}
 
-              <TouchableOpacity style={styles.addJenisButton} onPress={() => addJenis('', '')}>
+              <TouchableOpacity 
+                style={styles.addJenisButton} 
+                onPress={() => {
+                  if (rejectReasons.length > 0) {
+                    addJenis(rejectReasons[0].id, '');
+                  }
+                }}
+              >
                 <Text style={styles.addJenisButtonText}>+ Jenis Lain</Text>
               </TouchableOpacity>
 
