@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,12 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { SvgXml } from 'react-native-svg';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Constants from 'expo-constants';
 import { useKindeAuth } from '@kinde/expo';
@@ -510,6 +510,10 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
   const [dateObj, setDateObj] = useState(null);
   const [editingRecordType, setEditingRecordType] = useState(null);
   const [needsRepopulate, setNeedsRepopulate] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showRejectReasonModal, setShowRejectReasonModal] = useState(null); // null or item.id
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const [rejectReasonSearchQuery, setRejectReasonSearchQuery] = useState('');
 
   useEffect(() => {
     const total = daftarRejects.reduce((sum, item) => sum + (Number(item.kuantitas) || 0), 0);
@@ -571,6 +575,26 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
   useEffect(() => {
     if (dateObj) setTanggal(formatDate(dateObj));
   }, [dateObj]);
+
+  // Filtered locations for search
+  const filteredLocations = useMemo(() => {
+    const query = locationSearchQuery.trim().toLowerCase();
+    if (!query) return locations;
+    return locations.filter(loc => {
+      const name = (loc.name || loc.label || String(loc)).toLowerCase();
+      return name.includes(query);
+    });
+  }, [locations, locationSearchQuery]);
+
+  // Filtered reject reasons for search
+  const filteredRejectReasons = useMemo(() => {
+    const query = rejectReasonSearchQuery.trim().toLowerCase();
+    if (!query) return rejectReasons;
+    return rejectReasons.filter(reason => {
+      const name = (reason.name || reason.label || String(reason)).toLowerCase();
+      return name.includes(query);
+    });
+  }, [rejectReasons, rejectReasonSearchQuery]);
 
   function formatDate(d) {
     if (!d) return '';
@@ -1053,23 +1077,18 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
               {/* Lokasi */}
               <View style={styles.formRow}>
                 <Text style={styles.formLabel}>Lokasi*</Text>
-                <View style={{ borderWidth: 1, borderColor: COLORS.green, borderRadius: 4, overflow: 'hidden' }}>
-                  <Picker
-                    selectedValue={lokasiId}
-                    onValueChange={(itemValue) => {
-                      const location = locations.find(loc => loc.id === itemValue);
-                      setLokasiId(itemValue);
-                      setLokasi(location ? location.name : '');
-                    }}
-                    mode="dropdown"
-                    style={{ height: 48 }}
-                  >
-                    <Picker.Item label="Pilih lokasi..." value={null} />
-                    {locations.map((loc) => (
-                      <Picker.Item key={loc.id} label={loc.name || loc.label || String(loc)} value={loc.id} />
-                    ))}
-                  </Picker>
-                </View>
+                <TouchableOpacity 
+                  style={{ borderWidth: 1, borderColor: COLORS.green, borderRadius: 4, height: 48, justifyContent: 'center', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }}
+                  onPress={() => {
+                    setLocationSearchQuery('');
+                    setShowLocationModal(true);
+                  }}
+                >
+                  <Text style={{ flex: 1, color: lokasi ? '#000' : '#888' }}>
+                    {lokasi || 'Pilih lokasi...'}
+                  </Text>
+                  <SvgXml xml={downArrowSvg} width={12} height={8} />
+                </TouchableOpacity>
               </View>
 
               <View style={styles.separator} />
@@ -1084,21 +1103,18 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
               {daftarRejects.map((item) => (
                 <View key={item.id} style={styles.subFormRow}>
                   <View style={styles.dropdown}>
-                    <View style={{ flex: 1, borderWidth: 1, borderColor: COLORS.darkGray, borderRadius: 4, overflow: 'hidden' }}>
-                      <Picker
-                        selectedValue={item.reason_id}
-                        onValueChange={(itemValue) => {
-                          updateJenis(item.id, 'reason_id', itemValue);
-                        }}
-                        mode="dropdown"
-                        style={{ height: 40 }}
-                      >
-                        <Picker.Item label="Pilih jenis..." value={null} />
-                        {rejectReasons.map((reason) => (
-                          <Picker.Item key={reason.id} label={reason.name || reason.label || String(reason)} value={reason.id} />
-                        ))}
-                      </Picker>
-                    </View>
+                    <TouchableOpacity 
+                      style={{ flex: 1, borderWidth: 1, borderColor: COLORS.darkGray, borderRadius: 4, height: 40, justifyContent: 'center', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }}
+                      onPress={() => {
+                        setRejectReasonSearchQuery('');
+                        setShowRejectReasonModal(item.id);
+                      }}
+                    >
+                      <Text style={{ flex: 1, color: item.jenis ? '#000' : '#888', fontSize: 15 }}>
+                        {item.jenis || 'Pilih jenis...'}
+                      </Text>
+                      <SvgXml xml={downArrowSvg} width={12} height={8} />
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={() => removeJenis(item.id)} style={{ marginLeft: 8 }}>
                       <Icon name="close" size={16} color={COLORS.green} />
                     </TouchableOpacity>
@@ -1146,6 +1162,115 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
             </View>
           </Animated.View>
         )}
+
+        {/* Location Modal */}
+        <Modal
+          visible={showLocationModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowLocationModal(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowLocationModal(false)}
+          >
+            <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Pilih Lokasi</Text>
+                <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+                  <Icon name="close" size={24} color={COLORS.darkGray} />
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={styles.modalSearchInput}
+                placeholder="Type to search..."
+                value={locationSearchQuery}
+                onChangeText={setLocationSearchQuery}
+                autoFocus={false}
+              />
+              <ScrollView 
+                style={styles.modalScrollView}
+                keyboardShouldPersistTaps="handled"
+              >
+                {filteredLocations.map((loc) => (
+                  <TouchableOpacity
+                    key={loc.id}
+                    style={styles.modalOption}
+                    onPress={() => {
+                      setLokasiId(loc.id);
+                      setLokasi(loc.name || loc.label || String(loc));
+                      setShowLocationModal(false);
+                      setLocationSearchQuery('');
+                    }}
+                  >
+                    <Text style={styles.modalOptionText}>
+                      {loc.name || loc.label || String(loc)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                {filteredLocations.length === 0 && (
+                  <Text style={styles.modalNoResults}>No results found</Text>
+                )}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Reject Reason Modal */}
+        <Modal
+          visible={showRejectReasonModal !== null}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowRejectReasonModal(null)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowRejectReasonModal(null)}
+          >
+            <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Pilih Jenis</Text>
+                <TouchableOpacity onPress={() => setShowRejectReasonModal(null)}>
+                  <Icon name="close" size={24} color={COLORS.darkGray} />
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={styles.modalSearchInput}
+                placeholder="Type to search..."
+                value={rejectReasonSearchQuery}
+                onChangeText={setRejectReasonSearchQuery}
+                autoFocus={false}
+              />
+              <ScrollView 
+                style={styles.modalScrollView}
+                keyboardShouldPersistTaps="handled"
+              >
+                {filteredRejectReasons.map((reason) => (
+                  <TouchableOpacity
+                    key={reason.id}
+                    style={styles.modalOption}
+                    onPress={() => {
+                      if (showRejectReasonModal) {
+                        updateJenis(showRejectReasonModal, 'reason_id', reason.id);
+                      }
+                      setShowRejectReasonModal(null);
+                      setRejectReasonSearchQuery('');
+                    }}
+                  >
+                    <Text style={styles.modalOptionText}>
+                      {reason.name || reason.label || String(reason)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                {filteredRejectReasons.length === 0 && (
+                  <Text style={styles.modalNoResults}>No results found</Text>
+                )}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
     </View>
   );
 }
@@ -1437,9 +1562,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
-    padding: 8,
     marginRight: 8,
   },
   dropdownText: { flex: 1, color: COLORS.darkGray, fontSize: 15, padding: 0 },
@@ -1484,4 +1606,59 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resetButtonText: { color: COLORS.white, fontWeight: 'bold', fontSize: 16 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.green,
+  },
+  modalSearchInput: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray,
+    fontSize: 16,
+    color: COLORS.darkGray,
+  },
+  modalScrollView: {
+    maxHeight: 300,
+  },
+  modalOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray,
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: COLORS.darkGray,
+  },
+  modalNoResults: {
+    padding: 16,
+    textAlign: 'center',
+    color: '#999',
+    fontStyle: 'italic',
+  },
 });
