@@ -92,7 +92,6 @@ export default function Home() {
 
       <HomeHeader
         title="HYOSHII FARM"
-        showHomeButton={false}
         onLeftPress={() => {}}
         profileContent={
           <TouchableOpacity style={styles.avatar} onPress={() => setMenuVisible(true)}>
@@ -146,68 +145,24 @@ export default function Home() {
       </Modal>
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <Text style={styles.mainTitle}>HYOSHII MOBILE DASHBOARD</Text>
+
         <HomePageSection
-          title="REPORTS"
           items={[
-            { iconSvg: placeholderSvg, label: 'Packing', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Reject Packing', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Harvest', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Seedling Stock', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'HPT IPM', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Weather', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Greenhouse', onPress: () => {} },
             { iconSvg: placeholderSvg, label: 'Reject GH', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Productivity', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Brix', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'HPT Nursery', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Irrigation', onPress: () => {} },
+            { iconSvg: placeholderSvg, label: 'Monitoring Hama', onPress: () => {} },
+            { iconSvg: placeholderSvg, label: 'Mortalitas', onPress: () => navigation.navigate('Mortality') },
+            { iconSvg: placeholderSvg, label: 'Penggunaan Pestisida', onPress: () => navigation.navigate('PesticideUsage') },
           ]}
         />
 
         <HomePageSection
-          title="HPT"
+          title="Laporan"
           items={[
-            { iconSvg: placeholderSvg, label: 'Pesticide Usage', onPress: () => navigation.navigate('PesticideUsage') },
-            { iconSvg: placeholderSvg, label: 'HPT GH', onPress: () => navigation.navigate('HamaPenyakitTanaman') },
-            { iconSvg: placeholderSvg, label: 'HPT Nursery', onPress: () => {} },
-          ]}
-        />
-
-        <HomePageSection
-          title="IRRIGATION"
-          items={[{ iconSvg: placeholderSvg, label: 'Drip In', onPress: () => {} }]}
-        />
-
-        <HomePageSection
-          title="R & D"
-          items={[
-            { iconSvg: placeholderSvg, label: 'Tissue Culture', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Predator Management', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Seedling Stocks', onPress: () => {} },
-          ]}
-        />
-
-        <HomePageSection
-          title="OPERATIONAL"
-          items={[
-            { iconSvg: placeholderSvg, label: 'Brix', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Harvest', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Reject GH', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Forecast', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Mortality', onPress: () => navigation.navigate('Mortality') },
-          ]}
-        />
-
-        <HomePageSection
-          title="DATA"
-          items={[
-            { iconSvg: placeholderSvg, label: 'Fruits', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Product', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Predator', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Pesticide', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'PIC', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Location', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Hama', onPress: () => {} },
+            { iconSvg: placeholderSvg, label: 'Produksi', onPress: () => {} },
+            { iconSvg: placeholderSvg, label: 'Produktifitas', onPress: () => {} },
+            { iconSvg: placeholderSvg, label: 'Hama dan Penyakit', onPress: () => navigation.navigate('HamaPenyakitTanaman') },
+            { iconSvg: placeholderSvg, label: 'Lokasi', onPress: () => {} },
           ]}
         />
       </ScrollView>
@@ -216,7 +171,7 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF9F2' },
+  container: { flex: 1, backgroundColor: '#F8F5ED' },
 
   avatar: {
     width: 36, height: 36, borderRadius: 18,
@@ -263,4 +218,11 @@ const styles = StyleSheet.create({
   rowCenter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
 
   scrollContainer: { padding: 20, gap: 16, paddingBottom: 40 },
+  mainTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D5B50',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
 });

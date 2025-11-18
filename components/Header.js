@@ -11,11 +11,17 @@ import {
 import { SvgXml } from 'react-native-svg';
 import { useFonts } from 'expo-font';
 
+const hamburgerSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <path d="M3 12H21M3 6H21M3 18H21" stroke="#2D5B50" stroke-width="2" stroke-linecap="round"/>
+</svg>`;
+
 export default function HomeHeader({
   title = 'HYOSHII FARM',
   logoSvg,
   onLeftPress,
   profileContent,
+  showHamburger = false,
+  centerLogo = false,
 }) {
   const [fontsLoaded] = useFonts({
     'DMSans-Regular': require('../assets/fonts/DM_Sans/static/DMSans-Regular.ttf'),
@@ -26,20 +32,24 @@ export default function HomeHeader({
 
   return (
     <View style={styles.headerContainer}>
+      {/* Left side: hamburger menu */}
       <View style={styles.leftContainer}>
-        {logoSvg && (
-          onLeftPress ? (
-            <TouchableOpacity onPress={onLeftPress} style={styles.leftIconTouchable}>
-              <SvgXml xml={logoSvg} width={24} height={36} />
-            </TouchableOpacity>
-          ) : (
-            <SvgXml xml={logoSvg} width={24} height={36} />
-          )
+        {showHamburger && (
+          <TouchableOpacity onPress={onLeftPress || (() => {})} style={styles.leftIconTouchable}>
+            <SvgXml xml={hamburgerSvg} width={24} height={24} />
+          </TouchableOpacity>
         )}
-        <Text style={styles.brand}>{title}</Text>
       </View>
 
-      {/* Right side: profile avatar or whatever is passed */}
+      {/* Center: logo */}
+      {centerLogo && logoSvg && (
+        <View style={styles.centerContainer}>
+          <SvgXml xml={logoSvg} width={30} height={30} />
+          <Text style={styles.logoText}>HYOSHII</Text>
+        </View>
+      )}
+
+      {/* Right side: profile avatar */}
       <View style={styles.rightContainer}>
         {profileContent}
       </View>
@@ -79,6 +89,19 @@ const styles = StyleSheet.create({
     color: '#FFFFF8',
     marginLeft: 10,
     letterSpacing: 1.2,
+  },
+  centerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    gap: 8,
+  },
+  logoText: {
+    fontSize: 16,
+    fontFamily: 'DMSans-Bold',
+    color: '#7A2929',
+    letterSpacing: 0.5,
   },
   rightContainer: {
     flexDirection: 'row',

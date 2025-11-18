@@ -1,11 +1,9 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { SvgXml } from 'react-native-svg';
 
 export default function IconTextButton({ iconSvg, label, onPress }) {
   return (
     <TouchableOpacity style={styles.button} onPress={onPress}>
-      <SvgXml xml={iconSvg} width={22} height={22} />
       <Text style={styles.label}>{label}</Text>
     </TouchableOpacity>
   );
@@ -13,17 +11,20 @@ export default function IconTextButton({ iconSvg, label, onPress }) {
 
 const styles = StyleSheet.create({
   button: {
-    width: 56,    
-    height: 64,     
-    marginVertical: 8,
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#2D5B50',
+    borderRadius: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   label: {
-    marginTop: 6,
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#000',
+    color: '#2D5B50',
     textAlign: 'center',
   },
 });
