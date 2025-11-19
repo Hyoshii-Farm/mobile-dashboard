@@ -149,8 +149,8 @@ export default function Home() {
 
         <HomePageSection
           items={[
-            { iconSvg: placeholderSvg, label: 'Reject GH', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Monitoring Hama', onPress: () => {} },
+            { iconSvg: placeholderSvg, label: 'Reject GH', onPress: () => navigation.navigate('Reject') },
+            { iconSvg: placeholderSvg, label: 'Monitoring Hama', onPress: () => navigation.navigate('HamaPenyakitTanaman') },
             { iconSvg: placeholderSvg, label: 'Mortalitas', onPress: () => navigation.navigate('Mortality') },
             { iconSvg: placeholderSvg, label: 'Penggunaan Pestisida', onPress: () => navigation.navigate('PesticideUsage') },
           ]}
@@ -161,7 +161,7 @@ export default function Home() {
           items={[
             { iconSvg: placeholderSvg, label: 'Produksi', onPress: () => {} },
             { iconSvg: placeholderSvg, label: 'Produktifitas', onPress: () => {} },
-            { iconSvg: placeholderSvg, label: 'Hama dan Penyakit', onPress: () => navigation.navigate('HamaPenyakitTanaman') },
+            { iconSvg: placeholderSvg, label: 'Hama dan Penyakit', onPress: () => {} },
             { iconSvg: placeholderSvg, label: 'Lokasi', onPress: () => {} },
           ]}
         />
