@@ -172,7 +172,7 @@ export default function RejectPage() {
 
 function RejectDataView({ authHeaders, onEdit, onDelete, refreshTrigger }) {
   const [rejectData, setRejectData] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 100, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [expandedRows, setExpandedRows] = useState({});
@@ -598,11 +598,26 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     return () => clearTimeout(timeoutId);
   }, [rejectReasonSearchQuery, showRejectReasonModal]);
 
-  // Filtered locations - use locations directly since API handles filtering
-  const filteredLocations = locations;
 
-  // Filtered reject reasons - use rejectReasons directly since API handles filtering
-  const filteredRejectReasons = rejectReasons;
+  // Filtered locations for search
+  const filteredLocations = useMemo(() => {
+    const query = locationSearchQuery.trim().toLowerCase();
+    if (!query) return locations;
+    return locations.filter(loc => {
+      const name = (loc.name || loc.label || String(loc)).toLowerCase();
+      return name.includes(query);
+    });
+  }, [locations, locationSearchQuery]);
+
+  // Filtered reject reasons for search
+  const filteredRejectReasons = useMemo(() => {
+    const query = rejectReasonSearchQuery.trim().toLowerCase();
+    if (!query) return rejectReasons;
+    return rejectReasons.filter(reason => {
+      const name = (reason.name || reason.label || String(reason)).toLowerCase();
+      return name.includes(query);
+    });
+  }, [rejectReasons, rejectReasonSearchQuery]);
 
   function formatDate(d) {
     if (!d) return '';
@@ -651,12 +666,11 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     return headers;
   };
 
-  async function fetchLocations(searchQuery = '') {
+  async function fetchLocations() {
     if (!API_BASE) return;
     try {
       const headers = await makeHeaders();
-      const searchParam = searchQuery ? `search=${encodeURIComponent(searchQuery)}` : 'search';
-      const url = `${API_BASE}/location/dropdown?${searchParam}&concise=true&nursery=false&pageSize=100`;
+      const url = `${API_BASE}/location/dropdown?search&concise=true&nursery=false&pageSize=100`;
       const res = await fetch(url, { method: 'GET', headers });
       if (!res.ok) throw new Error(`GET failed: ${res.status}`);
       const data = await res.json();
@@ -667,12 +681,11 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     }
   }
 
-  async function fetchRejectReasons(searchQuery = '') {
+  async function fetchRejectReasons() {
     if (!API_BASE) return;
     try {
       const headers = await makeHeaders();
-      const searchParam = searchQuery ? `?search=${encodeURIComponent(searchQuery)}&pageSize=100` : `?pageSize=100`;
-      const url = `${API_BASE}/reject-reason${searchParam}`;
+      const url = `${API_BASE}/reject-reason?pageSize=100`;
       const res = await fetch(url, { method: 'GET', headers });
       if (!res.ok) throw new Error(`GET failed: ${res.status}`);
       const data = await res.json();
@@ -1092,8 +1105,6 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
                   onPress={() => {
                     setLocationSearchQuery('');
                     setShowLocationModal(true);
-                    // Fetch all locations when opening modal
-                    fetchLocations('');
                   }}
                 >
                   <Text style={{ flex: 1, color: lokasi ? '#000' : '#888' }}>
@@ -1120,8 +1131,6 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
                       onPress={() => {
                         setRejectReasonSearchQuery('');
                         setShowRejectReasonModal(item.id);
-                        // Fetch all reject reasons when opening modal
-                        fetchRejectReasons('');
                       }}
                     >
                       <Text style={{ flex: 1, color: item.jenis ? '#000' : '#888', fontSize: 15 }}>
