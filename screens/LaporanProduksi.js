@@ -194,18 +194,36 @@ export default function LaporanProduksiPage() {
   const formatPercentage = (current, previous) => {
     const change = calculatePercentageChange(current, previous);
     const arrow = change >= 0 ? '▲' : '▼';
-    const absChange = Math.abs(change).toFixed(1);
+    const absChange = formatIndonesianNumber(Math.abs(change), 1);
     return `${arrow} ${absChange}%`;
   };
 
   // Format percentage from API (already calculated)
   const formatPercentageFromValue = (percentageValue) => {
     if (percentageValue === null || percentageValue === undefined || !isFinite(percentageValue)) {
-      return '▲ 0.0%';
+      return '▲ 0,0%';
     }
     const arrow = percentageValue >= 0 ? '▲' : '▼';
-    const absValue = Math.abs(percentageValue).toFixed(1);
+    const absValue = formatIndonesianNumber(Math.abs(percentageValue), 1);
     return `${arrow} ${absValue}%`;
+  };
+
+  // Format number in Indonesian locale (dot for thousands, comma for decimal)
+  const formatIndonesianNumber = (value, decimals = 0) => {
+    if (value === null || value === undefined || !isFinite(value)) {
+      return '0';
+    }
+    
+    const numValue = Number(value);
+    if (decimals > 0) {
+      const fixed = numValue.toFixed(decimals);
+      const parts = fixed.split('.');
+      const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      const decimalPart = parts[1] || '';
+      return decimalPart ? `${integerPart},${decimalPart}` : integerPart;
+    } else {
+      return numValue.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
   };
 
   // Get location IDs from selected location names
@@ -239,7 +257,7 @@ export default function LaporanProduksiPage() {
       const startDateStr = formatDate(startDate);
       const endDateStr = formatDate(endDate);
       
-      const url = `${API_BASE}/report/ops/production?start_date=${startDateStr}&end_date=${endDateStr}&period=daily&location_id=${locationIds}`;
+      const url = `${API_BASE}/report/ops/production?start_date=${startDateStr}&end_date=${endDateStr}&period=daily&location_id=${locationIds}&unit=kg`;
       
       const response = await fetch(url, { headers });
       
@@ -322,6 +340,13 @@ export default function LaporanProduksiPage() {
         }
       }
       
+      // Get location data for packing contribution
+      const packingLocationData = result.packing?.location || [];
+      const packingLocationDetails = packingLocationData.map(loc => ({
+        location: loc.name || '',
+        quantity: loc.quantity || 0,
+      })).filter(loc => loc.location && loc.location.trim().length > 0);
+
       const transformed = {
         packing: {
           totalPack: packingKpi.actual || 0,
@@ -331,10 +356,19 @@ export default function LaporanProduksiPage() {
           periodeTochio: tochioVariant.last_actual || 0,
           periodeMomoka: momokaVariant.last_actual || 0,
           details: packingDetails,
+          locationDetails: packingLocationDetails,
+          lowestLocation: packingKpi.lowest_location || '',
+          highestLocation: packingKpi.highest_location || '',
+          lowestValue: isPlaceholderValue(packingKpi.lowest) ? null : packingKpi.lowest,
+          highestValue: isPlaceholderValue(packingKpi.highest) ? null : packingKpi.highest,
+          lowestPercentage: packingKpi.diff_lowest || 0,
+          highestPercentage: packingKpi.diff_highest || 0,
         },
         reject: {
           totalRatio: rejectRatio.actual || 0,
+          totalReject: rejectKpi.actual || 0,
           periodeRatio: rejectRatio.last_actual || 0,
+          periodeReject: rejectKpi.last_actual || 0,
           details: rejectKpi.detail?.map(d => {
             const harvestLocationData = harvestDetail.find(h => h.location === d.name);
             const rejectAmount = d.actual || 0;
@@ -356,6 +390,7 @@ export default function LaporanProduksiPage() {
             
             return {
               location: d.name || '',
+              reject: rejectAmount,
               ratio: calculatedRatio,
               percentage: d.diff_actual || 0,
             };
@@ -533,8 +568,8 @@ export default function LaporanProduksiPage() {
 
     const formatNumber = (val) => {
       if (formatValue) return formatValue(val);
-      if (val % 1 === 0) return val.toLocaleString();
-      return val.toFixed(1);
+      if (val % 1 === 0) return formatIndonesianNumber(val);
+      return formatIndonesianNumber(val, 1);
     };
 
     return (
@@ -632,9 +667,7 @@ export default function LaporanProduksiPage() {
 
   const renderPackingTab = () => {
     const packing = productionData.packing || {};
-    const details = packing.details || [];
-    const lowestDetail = details[0] || {};
-    const highestDetail = details[1] || {};
+    const locationDetails = packing.locationDetails || [];
     
     const totalPack = packing.totalPack || 0;
     const periodePack = packing.periodePack || 0;
@@ -642,10 +675,12 @@ export default function LaporanProduksiPage() {
     const periodeTochio = packing.periodeTochio || 0;
     const totalMomoka = packing.totalMomoka || 0;
     const periodeMomoka = packing.periodeMomoka || 0;
-    const lowest = lowestDetail.lowest || 0;
-    const highest = highestDetail.highest || 0;
-    const lowestPercentage = lowestDetail.percentage || 0;
-    const highestPercentage = highestDetail.percentage || 0;
+    const lowestLocation = packing.lowestLocation || '';
+    const highestLocation = packing.highestLocation || '';
+    const lowestValue = packing.lowestValue;
+    const highestValue = packing.highestValue;
+    const lowestPercentage = packing.lowestPercentage || 0;
+    const highestPercentage = packing.highestPercentage || 0;
     
     return (
       <View>
@@ -653,24 +688,24 @@ export default function LaporanProduksiPage() {
         <View style={styles.totalCard}>
           <Text style={styles.cardTitle}>TOTAL PACK</Text>
           <Text style={styles.cardValue}>
-            {totalPack.toLocaleString()} <Text style={styles.cardUnit}>pack ({formatPercentage(totalPack, periodePack)})</Text>
+            {formatIndonesianNumber(totalPack)} <Text style={styles.cardUnit}>pack ({formatPercentage(totalPack, periodePack)})</Text>
           </Text>
-          <Text style={styles.cardPeriode}>periode lalu : {periodePack.toLocaleString()} pack</Text>
+          <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodePack)} pack</Text>
           
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
-              <Text style={styles.cardDetailLocation}>{lowestDetail.location || '-'}</Text>
+              <Text style={styles.cardDetailLocation}>{lowestLocation || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {lowest.toLocaleString()} pack <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPercentage)})</Text>
+                {lowestValue === null ? '-' : `${formatIndonesianNumber(lowestValue)} pack`} <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPercentage)})</Text>
               </Text>
             </View>
             
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
-              <Text style={styles.cardDetailLocation}>{highestDetail.location || '-'}</Text>
+              <Text style={styles.cardDetailLocation}>{highestLocation || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {highest.toLocaleString()} pack <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestPercentage)})</Text>
+                {highestValue === null ? '-' : `${formatIndonesianNumber(highestValue)} pack`} <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestPercentage)})</Text>
               </Text>
             </View>
           </View>
@@ -679,24 +714,24 @@ export default function LaporanProduksiPage() {
         <View style={styles.totalCard}>
           <Text style={styles.cardTitle}>TOTAL TOCHIO</Text>
           <Text style={styles.cardValue}>
-            {totalTochio.toLocaleString()} <Text style={styles.cardUnit}>pack ({formatPercentage(totalTochio, periodeTochio)})</Text>
+            {formatIndonesianNumber(totalTochio)} <Text style={styles.cardUnit}>pack ({formatPercentage(totalTochio, periodeTochio)})</Text>
           </Text>
-          <Text style={styles.cardPeriode}>periode lalu : {periodeTochio.toLocaleString()} pack</Text>
+          <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeTochio)} pack</Text>
           
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
-              <Text style={styles.cardDetailLocation}>{lowestDetail.location || '-'}</Text>
+              <Text style={styles.cardDetailLocation}>{lowestLocation || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {lowest.toLocaleString()} pack <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPercentage)})</Text>
+                {lowestValue === null ? '-' : `${formatIndonesianNumber(lowestValue)} pack`} <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPercentage)})</Text>
               </Text>
             </View>
             
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
-              <Text style={styles.cardDetailLocation}>{highestDetail.location || '-'}</Text>
+              <Text style={styles.cardDetailLocation}>{highestLocation || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {highest.toLocaleString()} pack <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestPercentage)})</Text>
+                {highestValue === null ? '-' : `${formatIndonesianNumber(highestValue)} pack`} <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestPercentage)})</Text>
               </Text>
             </View>
           </View>
@@ -705,24 +740,24 @@ export default function LaporanProduksiPage() {
         <View style={styles.totalCard}>
           <Text style={styles.cardTitle}>TOTAL MOMOKA</Text>
           <Text style={styles.cardValue}>
-            {totalMomoka.toLocaleString()} <Text style={styles.cardUnit}>pack ({formatPercentage(totalMomoka, periodeMomoka)})</Text>
+            {formatIndonesianNumber(totalMomoka)} <Text style={styles.cardUnit}>pack ({formatPercentage(totalMomoka, periodeMomoka)})</Text>
           </Text>
-          <Text style={styles.cardPeriode}>periode lalu : {periodeMomoka.toLocaleString()} pack</Text>
+          <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeMomoka)} pack</Text>
           
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
-              <Text style={styles.cardDetailLocation}>{lowestDetail.location || '-'}</Text>
+              <Text style={styles.cardDetailLocation}>{lowestLocation || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {lowest.toLocaleString()} pack <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPercentage)})</Text>
+                {lowestValue === null ? '-' : `${formatIndonesianNumber(lowestValue)} pack`} <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPercentage)})</Text>
               </Text>
             </View>
             
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
-              <Text style={styles.cardDetailLocation}>{highestDetail.location || '-'}</Text>
+              <Text style={styles.cardDetailLocation}>{highestLocation || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {highest.toLocaleString()} pack <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestPercentage)})</Text>
+                {highestValue === null ? '-' : `${formatIndonesianNumber(highestValue)} pack`} <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestPercentage)})</Text>
               </Text>
             </View>
           </View>
@@ -732,7 +767,7 @@ export default function LaporanProduksiPage() {
         <View style={styles.contributionCard}>
           <Text style={styles.contributionTitle}>KONTRIBUSI LOKASI</Text>
           {(() => {
-            if (!details || details.length === 0) {
+            if (!locationDetails || locationDetails.length === 0) {
               return (
                 <View style={styles.emptyDataContainer}>
                   <Text style={styles.emptyDataText}>Tidak ada data</Text>
@@ -740,29 +775,16 @@ export default function LaporanProduksiPage() {
               );
             }
             
-            const validDetails = details.filter(d => d && d.location && d.location.trim().length > 0);
-            
-            if (validDetails.length === 0) {
-              return (
-                <View style={styles.emptyDataContainer}>
-                  <Text style={styles.emptyDataText}>Tidak ada data</Text>
-                </View>
-              );
-            }
-            
-            const sortedDetails = [...validDetails].sort((a, b) => {
-              const aVal = (a.highest || a.lowest || 0);
-              const bVal = (b.highest || b.lowest || 0);
-              return bVal - aVal;
-            });
-            const maxValue = Math.max(...sortedDetails.map(d => (d.highest || d.lowest || 0)), 1);
+            const sortedDetails = [...locationDetails].sort((a, b) => (b.quantity || 0) - (a.quantity || 0));
+            const maxValue = Math.max(...sortedDetails.map(d => d.quantity || 0), 1);
             
             return renderBarChart(
               sortedDetails,
-              (item) => item.highest || item.lowest || 0,
+              (item) => item.quantity || 0,
               (item) => item.location || '-',
               maxValue,
-              '#8B2D2D'
+              '#8B2D2D',
+              (val) => val > 0 ? formatIndonesianNumber(val) : '-'
             );
           })()}
         </View>
@@ -774,47 +796,85 @@ export default function LaporanProduksiPage() {
     const reject = productionData.reject || {};
     const details = reject.details || [];
     
-    let lowestDetail = {};
-    let highestDetail = {};
+    let lowestRejectDetail = {};
+    let highestRejectDetail = {};
+    let lowestRatioDetail = {};
+    let highestRatioDetail = {};
     
     if (details.length > 0) {
+      // Find lowest and highest reject amounts (in kg)
+      const rejectAmounts = details.map(d => d.reject || 0);
+      const minReject = Math.min(...rejectAmounts);
+      const maxReject = Math.max(...rejectAmounts);
+      lowestRejectDetail = details.find(d => (d.reject || 0) === minReject) || details[0] || {};
+      highestRejectDetail = details.find(d => (d.reject || 0) === maxReject) || details[0] || {};
+      
+      // Find lowest and highest ratios
       const ratios = details.map(d => d.ratio || 0);
       const minRatio = Math.min(...ratios);
       const maxRatio = Math.max(...ratios);
-      lowestDetail = details.find(d => (d.ratio || 0) === minRatio) || details[0] || {};
-      highestDetail = details.find(d => (d.ratio || 0) === maxRatio) || details[0] || {};
+      lowestRatioDetail = details.find(d => (d.ratio || 0) === minRatio) || details[0] || {};
+      highestRatioDetail = details.find(d => (d.ratio || 0) === maxRatio) || details[0] || {};
     }
     
     const totalRatio = reject.totalRatio || 0;
     const periodeRatio = reject.periodeRatio || 0;
-    const lowestRatio = lowestDetail.ratio || 0;
-    const highestRatio = highestDetail.ratio || 0;
-    const lowestPercentage = lowestDetail.percentage || 0;
-    const highestPercentage = highestDetail.percentage || 0;
+    const totalReject = reject.totalReject || 0;
+    const periodeReject = reject.periodeReject || 0;
+    const lowestRatio = lowestRatioDetail.ratio || 0;
+    const highestRatio = highestRatioDetail.ratio || 0;
+    const lowestRatioPercentage = lowestRatioDetail.percentage || 0;
+    const highestRatioPercentage = highestRatioDetail.percentage || 0;
     
     return (
       <View>
         <View style={styles.totalCard}>
-          <Text style={styles.cardTitle}>TOTAL RASIO REJECT</Text>
+          <Text style={styles.cardTitle}>TOTAL REJECT</Text>
           <Text style={styles.cardValue}>
-            {totalRatio.toFixed(1)}<Text style={styles.cardUnit}>% ({formatPercentage(totalRatio, periodeRatio)})</Text>
+            {formatIndonesianNumber(totalReject, 1)} <Text style={styles.cardUnit}>Kg ({formatPercentage(totalReject, periodeReject)})</Text>
           </Text>
-          <Text style={styles.cardPeriode}>periode lalu : {periodeRatio.toFixed(1)}%</Text>
+          <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeReject, 1)} Kg</Text>
           
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
-              <Text style={styles.cardDetailLocation}>{lowestDetail.location || '-'}</Text>
+              <Text style={styles.cardDetailLocation}>{lowestRejectDetail.location || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {lowestRatio.toFixed(1)}% <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPercentage)})</Text>
+                {formatIndonesianNumber(lowestRejectDetail.reject || 0, 1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestRejectDetail.percentage || 0)})</Text>
               </Text>
             </View>
             
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
-              <Text style={styles.cardDetailLocation}>{highestDetail.location || '-'}</Text>
+              <Text style={styles.cardDetailLocation}>{highestRejectDetail.location || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {highestRatio.toFixed(1)}% <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestPercentage)})</Text>
+                {formatIndonesianNumber(highestRejectDetail.reject || 0, 1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestRejectDetail.percentage || 0)})</Text>
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.totalCard}>
+          <Text style={styles.cardTitle}>TOTAL RASIO REJECT</Text>
+          <Text style={styles.cardValue}>
+            {formatIndonesianNumber(totalRatio, 1)}<Text style={styles.cardUnit}>% ({formatPercentage(totalRatio, periodeRatio)})</Text>
+          </Text>
+          <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeRatio, 1)}%</Text>
+          
+          <View style={styles.cardDetailRow}>
+            <View style={styles.cardDetailItem}>
+              <Text style={styles.cardDetailLabel}>Terendah</Text>
+              <Text style={styles.cardDetailLocation}>{lowestRatioDetail.location || '-'}</Text>
+              <Text style={styles.cardDetailValue}>
+                {formatIndonesianNumber(lowestRatio, 1)}% <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestRatioPercentage)})</Text>
+              </Text>
+            </View>
+            
+            <View style={styles.cardDetailItem}>
+              <Text style={styles.cardDetailLabel}>Tertinggi</Text>
+              <Text style={styles.cardDetailLocation}>{highestRatioDetail.location || '-'}</Text>
+              <Text style={styles.cardDetailValue}>
+                {formatIndonesianNumber(highestRatio, 1)}% <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestRatioPercentage)})</Text>
               </Text>
             </View>
           </View>
@@ -832,7 +892,8 @@ export default function LaporanProduksiPage() {
               (item) => item.ratio || 0,
               (item) => item.location || '-',
               maxValue,
-              '#8B2D2D'
+              '#8B2D2D',
+              (val) => val > 0 ? `${formatIndonesianNumber(val, 1)}%` : '-'
             );
           })() : (
             <View style={styles.emptyDataContainer}>
@@ -876,16 +937,16 @@ export default function LaporanProduksiPage() {
         <View style={styles.totalCard}>
           <Text style={styles.cardTitle}>TOTAL PANEN</Text>
           <Text style={styles.cardValue}>
-            {(totalPanen / 1000).toFixed(1)} <Text style={styles.cardUnit}>Kg ({formatPercentage(totalPanen, periodePanen)})</Text>
+            {formatIndonesianNumber(totalPanen, 1)} <Text style={styles.cardUnit}>Kg ({formatPercentage(totalPanen, periodePanen)})</Text>
           </Text>
-          <Text style={styles.cardPeriode}>periode lalu : {(periodePanen / 1000).toFixed(1)} Kg</Text>
+          <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodePanen, 1)} Kg</Text>
           
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
               <Text style={styles.cardDetailLocation}>{lowestPanen.location || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {((lowestPanen.kg || 0) / 1000).toFixed(1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPanen.percentage || 0)})</Text>
+                {formatIndonesianNumber(lowestPanen.kg || 0, 1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPanen.percentage || 0)})</Text>
               </Text>
             </View>
             
@@ -893,7 +954,7 @@ export default function LaporanProduksiPage() {
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
               <Text style={styles.cardDetailLocation}>{highestPanen.location || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {((highestPanen.kg || 0) / 1000).toFixed(1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestPanen.percentage || 0)})</Text>
+                {formatIndonesianNumber(highestPanen.kg || 0, 1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestPanen.percentage || 0)})</Text>
               </Text>
             </View>
           </View>
@@ -902,16 +963,16 @@ export default function LaporanProduksiPage() {
         <View style={styles.totalCard}>
           <Text style={styles.cardTitle}>TOTAL REJECT</Text>
           <Text style={styles.cardValue}>
-            {(totalReject / 1000).toFixed(1)} <Text style={styles.cardUnit}>Kg ({formatPercentage(totalReject, periodeReject)})</Text>
+            {formatIndonesianNumber(totalReject, 1)} <Text style={styles.cardUnit}>Kg ({formatPercentage(totalReject, periodeReject)})</Text>
           </Text>
-          <Text style={styles.cardPeriode}>periode lalu : {(periodeReject / 1000).toFixed(1)} Kg</Text>
+          <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeReject, 1)} Kg</Text>
           
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
               <Text style={styles.cardDetailLocation}>{lowestReject.location || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {((lowestReject.reject || 0) / 1000).toFixed(1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestReject.percentage || 0)})</Text>
+                {formatIndonesianNumber(lowestReject.reject || 0, 1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestReject.percentage || 0)})</Text>
               </Text>
             </View>
             
@@ -919,7 +980,7 @@ export default function LaporanProduksiPage() {
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
               <Text style={styles.cardDetailLocation}>{highestReject.location || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {((highestReject.reject || 0) / 1000).toFixed(1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestReject.percentage || 0)})</Text>
+                {formatIndonesianNumber(highestReject.reject || 0, 1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestReject.percentage || 0)})</Text>
               </Text>
             </View>
           </View>
@@ -928,16 +989,16 @@ export default function LaporanProduksiPage() {
         <View style={styles.totalCard}>
           <Text style={styles.cardTitle}>EFISIENSI</Text>
           <Text style={styles.cardValue}>
-            {efisiensi.toFixed(1)}<Text style={styles.cardUnit}>% ({formatPercentage(efisiensi, periodeEfisiensi)})</Text>
+            {formatIndonesianNumber(efisiensi, 1)}<Text style={styles.cardUnit}>% ({formatPercentage(efisiensi, periodeEfisiensi)})</Text>
           </Text>
-          <Text style={styles.cardPeriode}>periode lalu : {periodeEfisiensi.toFixed(1)}%</Text>
+          <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeEfisiensi, 1)}%</Text>
           
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
               <Text style={styles.cardDetailLocation}>{lowestEfficiency.location || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {(lowestEfficiency.efficiency || 0).toFixed(1)}% <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestEfficiency.percentage || 0)})</Text>
+                {formatIndonesianNumber(lowestEfficiency.efficiency || 0, 1)}% <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestEfficiency.percentage || 0)})</Text>
               </Text>
             </View>
             
@@ -945,7 +1006,7 @@ export default function LaporanProduksiPage() {
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
               <Text style={styles.cardDetailLocation}>{highestEfficiency.location || '-'}</Text>
               <Text style={styles.cardDetailValue}>
-                {(highestEfficiency.efficiency || 0).toFixed(1)}% <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestEfficiency.percentage || 0)})</Text>
+                {formatIndonesianNumber(highestEfficiency.efficiency || 0, 1)}% <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(highestEfficiency.percentage || 0)})</Text>
               </Text>
             </View>
           </View>
@@ -960,11 +1021,11 @@ export default function LaporanProduksiPage() {
             
             return renderBarChart(
               sortedDetails,
-              (item) => (item.kg || 0) / 1000,
+              (item) => item.kg || 0,
               (item) => item.location || '-',
-              maxValue / 1000,
+              maxValue,
               '#8B2D2D',
-              (val) => val > 0 ? `${val.toFixed(1)} Kg` : '-'
+              (val) => val > 0 ? `${formatIndonesianNumber(val, 1)} Kg` : '-'
             );
           })() : (
             <View style={styles.emptyDataContainer}>
