@@ -159,7 +159,7 @@ export default function Home() {
         <HomePageSection
           title="Laporan"
           items={[
-            { iconSvg: placeholderSvg, label: 'Produksi', onPress: () => {} },
+            { iconSvg: placeholderSvg, label: 'Produksi', onPress: () => navigation.navigate('LaporanProduksi') },
             { iconSvg: placeholderSvg, label: 'Produktifitas', onPress: () => {} },
             { iconSvg: placeholderSvg, label: 'Hama dan Penyakit', onPress: () => {} },
             { iconSvg: placeholderSvg, label: 'Lokasi', onPress: () => {} },

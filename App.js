@@ -18,6 +18,7 @@ import HamaPenyakitTanamanPage from './screens/HamaPenyakitTanaman';
 import FormHamaPenyakit from './screens/FormHPT';
 import MortalityPage from './screens/Mortality';
 import FormMortality from './screens/FormMortality';
+import LaporanProduksiPage from './screens/LaporanProduksi';
 
 const Stack = createNativeStackNavigator();
 const navRef = createNavigationContainerRef();
@@ -52,6 +53,7 @@ const linking = {
       PesticideUsage: 'hpt/pesticide-usage',
       FormPesticideUsage: 'hpt/pesticide-usage/new',
       HamaPenyakitTanaman: 'hpt/monitoring',
+      LaporanProduksi: 'laporan/produksi',
       // /callback and /logout handled by auth, not navigation routes
     },
   },
@@ -138,6 +140,7 @@ export default function App() {
           <Stack.Screen name="FormHamaPenyakit" component={FormHamaPenyakit} />
           <Stack.Screen name="Mortality" component={MortalityPage} />
           <Stack.Screen name="FormMortality" component={FormMortality} />
+          <Stack.Screen name="LaporanProduksi" component={LaporanProduksiPage} />
         </Stack.Navigator>
       </NavigationContainer>
     </KindeAuthProvider>
