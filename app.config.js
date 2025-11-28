@@ -2,8 +2,14 @@ require('dotenv').config();
 
 module.exports = {
   expo: {
+    extra: {
+      eas: {
+        projectId: process.env.EAS_PROJECT_ID
+      }
+    },
+    owner: "hyoshiifarm",
     name: "hyoshiimobile",
-    slug: "hyoshiimobile",
+    slug: "hyoshii-mobile",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
