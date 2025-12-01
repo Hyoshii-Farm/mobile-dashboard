@@ -76,8 +76,7 @@ export default function Home() {
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true);
-      await logout({ logoutRedirectUri }); // opens browser, returns to /logout
-      // deep link listener above will handle close + navigation
+      await logout({ logoutRedirectUri }); 
     } catch (err) {
       console.error('Kinde logout failed:', err);
       setIsLoggingOut(false);
@@ -89,7 +88,7 @@ export default function Home() {
   return (
     <View style={styles.container}>
       <StatusBarCustom backgroundColor="#1D4949" />
-
+      
       <HomeHeader
         title="HYOSHII FARM"
         onLeftPress={() => {}}
