@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View, StyleSheet, ScrollView, TouchableWithoutFeedback, Keyboard, Text, TouchableOpacity,
   ActivityIndicator, TextInput, Alert,
@@ -68,6 +68,8 @@ export default function MortalityPage() {
   // Dynamic dropdown options from API
   const [lokasiOptions, setLokasiOptions] = useState([]);
   const [varietasOptions, setVarietasOptions] = useState([]);
+  const [lokasiObjects, setLokasiObjects] = useState([]); // Store full location objects for ID mapping
+  const [varietasObjects, setVarietasObjects] = useState([]); // Store full variant objects for ID mapping
   const [loading, setLoading] = useState({ mortality: false, lokasi: false, variant: false });
 
   const closeAllDropdowns = () => setFormDropdownOpen({ lokasi: false, varietas: false });
@@ -134,17 +136,51 @@ export default function MortalityPage() {
     return all;
   }, []);
 
+  // Helper function to get location name from object
+  const getLocationName = (loc) => {
+    return loc?.name || loc?.label || loc?.title || loc?.nama || loc?.nama_lokasi || loc?.location_name || '';
+  };
+
+  // Helper function to get location ID from object
+  const getLocationId = (loc) => {
+    return loc?.id || loc?.location_id || loc?.lokasi_id || loc?.id_lokasi || null;
+  };
+
+  // Helper function to get variant name from object
+  const getVariantName = (variant) => {
+    return variant?.name || variant?.variant_name || variant?.title || variant?.nama || '';
+  };
+
+  // Helper function to get variant ID from object
+  const getVariantId = (variant) => {
+    return variant?.id || variant?.variant_id || variant?.id_variant || null;
+  };
+
   const fetchLocationOptions = useCallback(async () => {
     try {
       setLoading((s) => ({ ...s, lokasi: true }));
       setServerStatus('connecting');
       
-      const locations = await fetchAllPages(ENDPOINTS.lokasi, PAGE_SIZE);
+      const headers = await getAuthHeaders();
+      // Use the same endpoint format as LaporanProduksi to get all locations
+      const url = `${API_BASE}/location/dropdown?search&concise=true&nursery=false&pageSize=100`;
       
-      // Extract location names from response
-      const locationNames = locations.map(loc => 
-        loc.name || loc.label || loc.title || loc.nama || loc.nama_lokasi || loc.location_name || String(loc)
-      ).filter(name => name && name.trim().length > 0);
+      const response = await fetch(url, { headers });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      // Store full location objects - handle different response structures
+      const locations = result.data || result || [];
+      setLokasiObjects(locations);
+      
+      // Extract location names using the helper function
+      const locationNames = locations
+        .map(getLocationName)
+        .filter(name => name && name.trim().length > 0);
       
       const uniqueLocations = Array.from(new Set(locationNames)).sort();
       setLokasiOptions(uniqueLocations);
@@ -155,6 +191,7 @@ export default function MortalityPage() {
       
       // Set empty options and show error to user
       setLokasiOptions([]);
+      setLokasiObjects([]);
       
       // Show error notification to user
       Alert.alert(
@@ -165,13 +202,16 @@ export default function MortalityPage() {
     } finally {
       setLoading((s) => ({ ...s, lokasi: false }));
     }
-  }, [fetchAllPages]);
+  }, [getAuthHeaders]);
 
   const fetchVariantOptions = useCallback(async () => {
     try {
       setLoading((s) => ({ ...s, variant: true }));
       
       const variants = await fetchAllPages(ENDPOINTS.variant, PAGE_SIZE);
+      
+      // Store full variant objects for ID mapping
+      setVarietasObjects(variants);
       
       // Extract variant names from response
       const variantNames = variants.map(variant => 
@@ -184,6 +224,7 @@ export default function MortalityPage() {
     } catch (error) {
       // Set empty options and show error to user
       setVarietasOptions([]);
+      setVarietasObjects([]);
       
       // Show error notification to user
       Alert.alert(
@@ -261,6 +302,32 @@ export default function MortalityPage() {
     fetchLocationOptions();
     fetchVariantOptions();
   }, [fetchLocationOptions, fetchVariantOptions]);
+
+  // Create mapping from location name to location ID
+  const locationIdMap = useMemo(() => {
+    const map = {};
+    lokasiObjects.forEach(loc => {
+      const name = getLocationName(loc);
+      const id = getLocationId(loc);
+      if (name && id != null) {
+        map[name] = id;
+      }
+    });
+    return map;
+  }, [lokasiObjects]);
+
+  // Create mapping from variant name to variant ID
+  const variantIdMap = useMemo(() => {
+    const map = {};
+    varietasObjects.forEach(variant => {
+      const name = getVariantName(variant);
+      const id = getVariantId(variant);
+      if (name && id != null) {
+        map[name] = id;
+      }
+    });
+    return map;
+  }, [varietasObjects]);
 
   const toggleExpand = (locationName) => {
     setExpandedLocation(expandedLocation === locationName ? null : locationName);
@@ -663,10 +730,32 @@ export default function MortalityPage() {
                   // Delete the old record
                   const deleteRes = await deleteFromApi(recordId);
                   if (deleteRes.ok) {
+                    // Get location and variant IDs from mappings
+                    const locationId = locationIdMap[formData.lokasi];
+                    const variantId = variantIdMap[formData.varietas];
+                    
+                    if (!locationId) {
+                      Alert.alert(
+                        'Kesalahan',
+                        'Lokasi tidak valid. Pastikan lokasi dipilih dengan benar.',
+                        [{ text: 'Mengerti', style: 'default' }]
+                      );
+                      return;
+                    }
+                    
+                    if (!variantId) {
+                      Alert.alert(
+                        'Kesalahan',
+                        'Varietas tidak valid. Pastikan varietas dipilih dengan benar.',
+                        [{ text: 'Mengerti', style: 'default' }]
+                      );
+                      return;
+                    }
+                    
                     // Create new record with updated data
                     const createPayload = {
-                      location_id: 1,
-                      variant_id: 1,
+                      location_id: locationId,
+                      variant_id: variantId,
                       planting_date: formData.tanggal.toISOString().split('T')[0] + 'T00:00:00.000Z',
                       add: {
                         quantity: parseInt(formData.tanamanSulam, 10) || 0,
@@ -734,9 +823,31 @@ export default function MortalityPage() {
         return;
       }
 
+      // Get location and variant IDs from mappings
+      const locationId = locationIdMap[formData.lokasi];
+      const variantId = variantIdMap[formData.varietas];
+      
+      if (!locationId) {
+        Alert.alert(
+          'Kesalahan',
+          'Lokasi tidak valid. Pastikan lokasi dipilih dengan benar.',
+          [{ text: 'Mengerti', style: 'default' }]
+        );
+        return;
+      }
+      
+      if (!variantId) {
+        Alert.alert(
+          'Kesalahan',
+          'Varietas tidak valid. Pastikan varietas dipilih dengan benar.',
+          [{ text: 'Mengerti', style: 'default' }]
+        );
+        return;
+      }
+
       const mortalityRecord = {
-        location_id: 1, // Note: Using default location_id - should be mapped from formData.lokasi
-        variant_id: 1,  // Note: Using default variant_id - should be mapped from formData.varietas
+        location_id: locationId,
+        variant_id: variantId,
         planting_date: formData.tanggal.toISOString(),
         add: {
           quantity: parseInt(formData.tanamanSulam, 10) || 0,
