@@ -20,6 +20,7 @@ import FormHamaPenyakit from './screens/FormHPT';
 import MortalityPage from './screens/Mortality';
 import FormMortality from './screens/FormMortality';
 import LaporanProduksiPage from './screens/LaporanProduksi';
+import LaporanHPTPage from './screens/LaporanHPT';
 
 const Stack = createNativeStackNavigator();
 const navRef = createNavigationContainerRef();
@@ -144,6 +145,7 @@ export default function App() {
           <Stack.Screen name="Mortality" component={MortalityPage} />
           <Stack.Screen name="FormMortality" component={FormMortality} />
           <Stack.Screen name="LaporanProduksi" component={LaporanProduksiPage} />
+          <Stack.Screen name="LaporanHPT" component={LaporanHPTPage} />
         </Stack.Navigator>
       </NavigationContainer>
     </KindeAuthProvider>
