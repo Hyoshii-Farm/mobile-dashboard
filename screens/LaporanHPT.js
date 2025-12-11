@@ -496,75 +496,6 @@ export default function LaporanHPTPage() {
             ))}
           </View>
         </View>
-
-        {/* Pest/Disease Tabs */}
-        <View style={styles.filterSection}>
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tab, activeType === 'Hama' && styles.tabActive]}
-              onPress={() => {
-                setActiveType('Hama');
-                closeAllDropdowns();
-                // Reset to first pest if available
-                if (pestOptions.length > 0 && !selectedPest) {
-                  setSelectedPest(pestOptions[0]);
-                }
-              }}
-            >
-              <Text style={[styles.tabText, activeType === 'Hama' && styles.tabTextActive]}>
-                Hama
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeType === 'Penyakit' && styles.tabActive]}
-              onPress={() => {
-                setActiveType('Penyakit');
-                closeAllDropdowns();
-                // Reset to first disease if available
-                if (diseaseOptions.length > 0 && !selectedDisease) {
-                  setSelectedDisease(diseaseOptions[0]);
-                }
-              }}
-            >
-              <Text style={[styles.tabText, activeType === 'Penyakit' && styles.tabTextActive]}>
-                Penyakit
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Dropdown for Pest/Disease */}
-          <View style={styles.dropdownContainer}>
-            <DropdownInput
-              label={`${activeType}*`}
-              value={activeType === 'Hama' ? (selectedPest || 'Pilih Hama') : (selectedDisease || 'Pilih Penyakit')}
-              onPress={() => {
-                if (activeType === 'Hama') {
-                  setDropdownOpen({ pest: !dropdownOpen.pest, disease: false });
-                } else {
-                  setDropdownOpen({ pest: false, disease: !dropdownOpen.disease });
-                }
-              }}
-            />
-            {activeType === 'Hama' && dropdownOpen.pest && (
-              <DropdownBox
-                items={pestOptions}
-                onSelect={(option) => {
-                  setSelectedPest(option);
-                  closeAllDropdowns();
-                }}
-              />
-            )}
-            {activeType === 'Penyakit' && dropdownOpen.disease && (
-              <DropdownBox
-                items={diseaseOptions}
-                onSelect={(option) => {
-                  setSelectedDisease(option);
-                  closeAllDropdowns();
-                }}
-              />
-            )}
-          </View>
-        </View>
       </View>
     );
   };
@@ -766,6 +697,75 @@ export default function LaporanHPTPage() {
           <Text style={styles.filterButtonText}>Filter</Text>
         </TouchableOpacity>
 
+        {/* Pest/Disease Tabs */}
+        <View style={styles.pestDiseaseContainer}>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeType === 'Hama' && styles.tabActive]}
+              onPress={() => {
+                setActiveType('Hama');
+                closeAllDropdowns();
+                // Reset to first pest if available
+                if (pestOptions.length > 0 && !selectedPest) {
+                  setSelectedPest(pestOptions[0]);
+                }
+              }}
+            >
+              <Text style={[styles.tabText, activeType === 'Hama' && styles.tabTextActive]}>
+                Hama
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeType === 'Penyakit' && styles.tabActive]}
+              onPress={() => {
+                setActiveType('Penyakit');
+                closeAllDropdowns();
+                // Reset to first disease if available
+                if (diseaseOptions.length > 0 && !selectedDisease) {
+                  setSelectedDisease(diseaseOptions[0]);
+                }
+              }}
+            >
+              <Text style={[styles.tabText, activeType === 'Penyakit' && styles.tabTextActive]}>
+                Penyakit
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Dropdown for Pest/Disease */}
+          <View style={styles.dropdownContainer}>
+            <DropdownInput
+              label={`${activeType}*`}
+              value={activeType === 'Hama' ? (selectedPest || 'Pilih Hama') : (selectedDisease || 'Pilih Penyakit')}
+              onPress={() => {
+                if (activeType === 'Hama') {
+                  setDropdownOpen({ pest: !dropdownOpen.pest, disease: false });
+                } else {
+                  setDropdownOpen({ pest: false, disease: !dropdownOpen.disease });
+                }
+              }}
+            />
+            {activeType === 'Hama' && dropdownOpen.pest && (
+              <DropdownBox
+                items={pestOptions}
+                onSelect={(option) => {
+                  setSelectedPest(option);
+                  closeAllDropdowns();
+                }}
+              />
+            )}
+            {activeType === 'Penyakit' && dropdownOpen.disease && (
+              <DropdownBox
+                items={diseaseOptions}
+                onSelect={(option) => {
+                  setSelectedDisease(option);
+                  closeAllDropdowns();
+                }}
+              />
+            )}
+          </View>
+        </View>
+
         {/* Filter Box */}
         {renderFilterBox()}
 
@@ -832,6 +832,9 @@ const styles = StyleSheet.create({
     color: '#FBF7EB',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  pestDiseaseContainer: {
+    marginBottom: 20,
   },
   filterBox: {
     backgroundColor: '#FFFFFF',
