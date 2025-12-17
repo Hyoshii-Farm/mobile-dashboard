@@ -160,7 +160,7 @@ export default function Home() {
           title="Laporan"
           items={[
             { iconSvg: placeholderSvg, label: 'Produksi', onPress: () => navigation.navigate('LaporanProduksi') },
-            { iconSvg: placeholderSvg, label: 'Produktifitas', onPress: () => {} },
+            { iconSvg: placeholderSvg, label: 'Produktifitas', onPress: () => navigation.navigate('LaporanProduktifitas') },
             { iconSvg: placeholderSvg, label: 'Hama dan Penyakit', onPress: () => navigation.navigate('LaporanHPT') },
             { iconSvg: placeholderSvg, label: 'Lokasi', onPress: () => {} },
           ]}
