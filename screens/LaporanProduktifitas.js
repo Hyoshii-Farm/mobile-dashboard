@@ -164,6 +164,11 @@ export default function LaporanProduktifitasPage() {
       return; // Don't fetch if no locations selected
     }
 
+    // Ensure dates are valid
+    if (!startDate || !endDate || !(startDate instanceof Date) || !(endDate instanceof Date)) {
+      return;
+    }
+
     try {
       setLoading((prev) => ({ ...prev, productivity: true }));
       
@@ -258,54 +263,67 @@ export default function LaporanProduktifitasPage() {
   };
 
   // Get cell background color based on value
+  // Red for values < 7, green for values >= 7, white for zero
   const getCellBackgroundColor = (value) => {
     if (value === 0 || value === null || value === undefined) {
-      return '#FFFFFF'; // White for zero
+      return '#FFFFFF';
     }
-    // Color thresholds based on design:
-    // Red for low values (< 5)
-    // Light red for moderate values (5-10)
-    // Green for high values (> 10)
-    if (value < 5) {
-      return '#FFCDD2'; // Light red (darker for very low values)
-    } else if (value < 10) {
-      return '#FFE5E5'; // Lighter red for moderate values
-    } else {
-      return '#C8E6C9'; // Light green for high values
-    }
+    return value < 7 ? '#FFCDD2' : '#C8E6C9';
   };
 
   // Extract week number from period_key
-  // period_key can be "week 17" or "2024/12/31" format
   const extractWeekNumber = (periodKey) => {
-    if (!periodKey) return null;
+    if (!periodKey) {
+      return null;
+    }
     
-    // Check if it's "week X" format
-    const weekMatch = periodKey.match(/week\s+(\d+)/i);
-    if (weekMatch) {
-      return parseInt(weekMatch[1], 10);
+    // Convert to string if it's not already
+    const keyStr = String(periodKey).trim();
+    
+    // Check if it's "week X" format (case insensitive, with or without space)
+    const weekMatch = keyStr.match(/week\s*(\d+)/i);
+    if (weekMatch && weekMatch[1]) {
+      const weekNum = parseInt(weekMatch[1], 10);
+      if (!isNaN(weekNum) && weekNum > 0) {
+        return weekNum;
+      }
+    }
+    
+    // Check for "W17" format (ISO week format)
+    const isoWeekMatch = keyStr.match(/[wW](\d+)/);
+    if (isoWeekMatch && isoWeekMatch[1]) {
+      const weekNum = parseInt(isoWeekMatch[1], 10);
+      if (!isNaN(weekNum) && weekNum > 0) {
+        return weekNum;
+      }
     }
     
     // If it's a date format, calculate week number
-    const dateMatch = periodKey.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+    const dateMatch = keyStr.match(/(\d{4})\/(\d{2})\/(\d{2})/);
     if (dateMatch) {
       const year = parseInt(dateMatch[1], 10);
       const month = parseInt(dateMatch[2], 10) - 1;
       const day = parseInt(dateMatch[3], 10);
-      const date = new Date(year, month, day);
-      return getWeekNumber(date);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        const date = new Date(year, month, day);
+        if (!isNaN(date.getTime())) {
+          return getWeekNumber(date);
+        }
+      }
     }
     
     return null;
   };
 
   // Get ISO week number from date
+  // ISO weeks start on Monday, and week 1 is the week containing Jan 4
   const getWeekNumber = (date) => {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const dayNum = d.getUTCDay() || 7; // Convert Sunday (0) to 7
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum); // Get Thursday of the week
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    const weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return Math.max(1, weekNum); // Ensure week number is at least 1
   };
 
 
@@ -314,29 +332,33 @@ export default function LaporanProduktifitasPage() {
       return [];
     }
 
-    // Collect all unique weeks from all trends
-    const weekSet = new Set();
-    trends.forEach((trend) => {
-      if (trend.details && Array.isArray(trend.details)) {
-        trend.details.forEach((detail) => {
-          const week = extractWeekNumber(detail.period_key);
-          if (week !== null) {
-            weekSet.add(week);
-          }
-        });
-      }
-    });
-
-    const allWeeks = Array.from(weekSet).sort((a, b) => a - b);
-
-    const buildWeeks = (trend) =>
-      allWeeks.map((week) => {
-        const detail = trend.details?.find((d) => extractWeekNumber(d.period_key) === week);
-        return {
-          week,
-          value: detail?.productivity || 0,
-        };
+    const buildWeeks = (trend) => {
+      if (!Array.isArray(trend.details)) return [];
+    
+      // Group values by week number
+      const weekBuckets = {};
+    
+      trend.details.forEach(detail => {
+        const week = extractWeekNumber(detail.period_key);
+        if (!week) return;
+    
+        const value = Number(detail.productivity);
+        if (isNaN(value)) return;
+    
+        if (!weekBuckets[week]) {
+          weekBuckets[week] = [];
+        }
+        weekBuckets[week].push(value);
       });
+    
+      // Calculate average per week and sort by week number
+      return Object.entries(weekBuckets)
+        .map(([week, values]) => ({
+          week: Number(week),
+          value: values.reduce((a, b) => a + b, 0) / values.length,
+        }))
+        .sort((a, b) => a.week - b.week);
+    };
 
     const result = [];
 
