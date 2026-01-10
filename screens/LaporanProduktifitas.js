@@ -25,7 +25,7 @@ const filterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20
 const getDefaultDateRange = () => {
   const today = new Date();
   const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  
+
   // Calculate days to go back to last Monday (Monday of last week)
   // If today is Monday (1), last Monday is 7 days ago
   // If today is Tuesday (2), last Monday is 8 days ago (2 + 6)
@@ -39,15 +39,15 @@ const getDefaultDateRange = () => {
   } else {
     daysToLastMonday = currentDay + 6; // Tuesday-Saturday: currentDay + 6
   }
-  
+
   const lastMonday = new Date(today);
   lastMonday.setDate(today.getDate() - daysToLastMonday);
   lastMonday.setHours(0, 0, 0, 0);
-  
+
   const lastSunday = new Date(lastMonday);
   lastSunday.setDate(lastMonday.getDate() + 6);
   lastSunday.setHours(23, 59, 59, 999);
-  
+
   return { startDate: lastMonday, endDate: lastSunday };
 };
 
@@ -106,30 +106,30 @@ export default function LaporanProduktifitasPage() {
   const fetchLocationOptions = useCallback(async () => {
     try {
       setLoading((prev) => ({ ...prev, locations: true }));
-      
+
       const headers = await getAuthHeaders();
       const url = `${API_BASE}/location/dropdown?search&concise=true&nursery=false&pageSize=100`;
-      
+
       const response = await fetch(url, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const result = await response.json();
       const locations = result.data || result || [];
       setLocationObjects(locations);
-      
+
       const locationNames = locations
         .map(getLocationName)
         .filter(name => name && name.trim().length > 0);
-      
+
       const uniqueLocations = Array.from(new Set(locationNames)).sort();
       setLocationOptions(uniqueLocations);
-      
+
       // Select all by default
       setSelectedLocations(uniqueLocations);
-      
+
     } catch (error) {
       Alert.alert(
         'Gagal Memuat Data',
@@ -171,38 +171,38 @@ export default function LaporanProduktifitasPage() {
 
     try {
       setLoading((prev) => ({ ...prev, productivity: true }));
-      
+
       const headers = await getAuthHeaders();
       const locationIds = getLocationIds();
       const startDateStr = formatDate(startDate);
       const endDateStr = formatDate(endDate);
-      
+
       const url = `${API_BASE}/report/ops/productivity/heatmap?startDate=${startDateStr}&endDate=${endDateStr}&location_id=${locationIds}`;
-      
+
       const response = await fetch(url, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const result = await response.json();
-      
+
       // Extract KPI data
       const kpi = result.kpi || {};
       const average = kpi.avg_productivity || 0;
       const highest = kpi.best_productivity || 0;
       const highestLocation = kpi.best_location || '';
-      
+
       // Transform trends data to weekly grid format
       const weeklyData = transformWeeklyData(result.trends || []);
-      
+
       setProductivityData({
         average: average,
         highest: highest,
         highestLocation: highestLocation,
         weeklyData: weeklyData,
       });
-      
+
     } catch (error) {
       console.error('Failed to fetch productivity data:', error);
       Alert.alert(
@@ -276,10 +276,10 @@ export default function LaporanProduktifitasPage() {
     if (!periodKey) {
       return null;
     }
-    
+
     // Convert to string if it's not already
     const keyStr = String(periodKey).trim();
-    
+
     // Check if it's "week X" format (case insensitive, with or without space)
     const weekMatch = keyStr.match(/week\s*(\d+)/i);
     if (weekMatch && weekMatch[1]) {
@@ -288,7 +288,7 @@ export default function LaporanProduktifitasPage() {
         return weekNum;
       }
     }
-    
+
     // Check for "W17" format (ISO week format)
     const isoWeekMatch = keyStr.match(/[wW](\d+)/);
     if (isoWeekMatch && isoWeekMatch[1]) {
@@ -297,7 +297,7 @@ export default function LaporanProduktifitasPage() {
         return weekNum;
       }
     }
-    
+
     // If it's a date format, calculate week number
     const dateMatch = keyStr.match(/(\d{4})\/(\d{2})\/(\d{2})/);
     if (dateMatch) {
@@ -311,7 +311,7 @@ export default function LaporanProduktifitasPage() {
         }
       }
     }
-    
+
     return null;
   };
 
@@ -332,32 +332,88 @@ export default function LaporanProduktifitasPage() {
       return [];
     }
 
-    const buildWeeks = (trend) => {
+    // Build weeks for a trend, preserving the original period_key labels from API
+    // isOverall: if true, use date format; if false, use "week X" format from period_key
+    const buildWeeks = (trend, isOverall = false) => {
       if (!Array.isArray(trend.details)) return [];
-    
-      // Group values by week number
+
+      // Group values by period_key, preserving order and original labels
       const weekBuckets = {};
-    
+      const periodKeyOrder = []; // Track order of appearance
+
       trend.details.forEach(detail => {
-        const week = extractWeekNumber(detail.period_key);
+        const periodKey = detail.period_key;
+        const periodLabel = detail.period_label || periodKey; // Use period_label if available
+        const week = extractWeekNumber(periodKey);
         if (!week) return;
-    
+
         const value = Number(detail.productivity);
         if (isNaN(value)) return;
-    
+
         if (!weekBuckets[week]) {
-          weekBuckets[week] = [];
+          weekBuckets[week] = {
+            values: [],
+            periodKey: periodKey,
+            periodLabel: periodLabel,
+          };
+          periodKeyOrder.push(week);
         }
-        weekBuckets[week].push(value);
+        weekBuckets[week].values.push(value);
       });
-    
+
       // Calculate average per week and sort by week number
       return Object.entries(weekBuckets)
-        .map(([week, values]) => ({
-          week: Number(week),
-          value: values.reduce((a, b) => a + b, 0) / values.length,
-        }))
+        .map(([weekNum, bucket]) => {
+          const week = Number(weekNum);
+          // Determine display label based on row type
+          let displayLabel;
+          if (isOverall) {
+            // For Overall row, show dates from period_label or extract from period_key
+            // period_label format: "2024/12/31 to 2025/01/06" -> show "2025/01/01" (start date formatted)
+            // or period_key might be the date directly
+            displayLabel = formatPeriodLabel(bucket.periodLabel, bucket.periodKey);
+          } else {
+            // For location rows, show "week X" from the original period_key
+            displayLabel = `week ${week}`;
+          }
+
+          return {
+            week: week,
+            value: bucket.values.reduce((a, b) => a + b, 0) / bucket.values.length,
+            displayLabel: displayLabel,
+          };
+        })
         .sort((a, b) => a.week - b.week);
+    };
+
+    // Helper to format period label for Overall row
+    const formatPeriodLabel = (periodLabel, periodKey) => {
+      // Try to extract a date from period_label (format: "2024/12/31 to 2025/01/06")
+      if (periodLabel && typeof periodLabel === 'string') {
+        // Check if it's in "YYYY/MM/DD to YYYY/MM/DD" format
+        const toMatch = periodLabel.match(/(\d{4}\/\d{2}\/\d{2})\s*to\s*(\d{4}\/\d{2}\/\d{2})/);
+        if (toMatch && toMatch[2]) {
+          // Return the end date in a shorter format (e.g., "2025/01/06")
+          return toMatch[2];
+        }
+
+        // Check if it's just a date format already
+        const dateMatch = periodLabel.match(/\d{4}\/\d{2}\/\d{2}/);
+        if (dateMatch) {
+          return dateMatch[0];
+        }
+      }
+
+      // Fallback to period_key if it's a date
+      if (periodKey && typeof periodKey === 'string') {
+        const dateMatch = periodKey.match(/\d{4}\/\d{2}\/\d{2}/);
+        if (dateMatch) {
+          return dateMatch[0];
+        }
+      }
+
+      // If no date found, just return the period_key as-is
+      return periodKey || periodLabel || '';
     };
 
     const result = [];
@@ -374,7 +430,8 @@ export default function LaporanProduktifitasPage() {
       result.push({
         location: overallTrend.location_code || overallTrend.location_name || 'Overall',
         days: overallTrend.age || 0,
-        weeks: buildWeeks(overallTrend),
+        weeks: buildWeeks(overallTrend, true), // isOverall = true
+        isOverall: true,
       });
     }
 
@@ -384,7 +441,8 @@ export default function LaporanProduktifitasPage() {
       result.push({
         location: trend.location_code || trend.location_name || `Location ${idx + 1}`,
         days: trend.age || 0,
-        weeks: buildWeeks(trend),
+        weeks: buildWeeks(trend, false), // isOverall = false
+        isOverall: false,
       });
     });
 
@@ -560,23 +618,23 @@ export default function LaporanProduktifitasPage() {
             </View>
 
             {/* Scrollable Right Section */}
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={true}
               style={styles.gridScrollView}
               contentContainerStyle={styles.gridScrollContent}
             >
               <View style={styles.gridRightSection}>
-                {/* Header */}
+                {/* Header - Use displayLabel from first row (Overall) */}
                 <View style={styles.gridHeaderWeeks}>
                   {productivityData.weeklyData[0]?.weeks?.map((weekData, idx) => (
                     <View key={idx} style={styles.gridHeaderWeek}>
-                      <Text style={styles.gridHeaderWeekText}>week {weekData.week}</Text>
+                      <Text style={styles.gridHeaderWeekText}>{weekData.displayLabel}</Text>
                     </View>
                   ))}
                 </View>
 
-                {/* Rows */}
+                {/* Rows - Each row uses its own displayLabel */}
                 {productivityData.weeklyData.map((row, rowIdx) => (
                   <View key={rowIdx} style={styles.gridRowWeeks}>
                     {row.weeks.map((weekData, weekIdx) => (
@@ -587,7 +645,7 @@ export default function LaporanProduktifitasPage() {
                           { backgroundColor: getCellBackgroundColor(weekData.value) }
                         ]}
                       >
-                        <Text style={styles.gridCellWeek}>week {weekData.week}</Text>
+                        <Text style={styles.gridCellWeek}>{weekData.displayLabel}</Text>
                         <Text style={styles.gridCellValue}>
                           {formatNumber(weekData.value, weekData.value % 1 === 0 ? 0 : 2)}
                         </Text>
@@ -772,7 +830,7 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   gridHeaderLeft: {
-    height: 40,
+    height: 48,
     justifyContent: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#E8D5D5',
@@ -784,11 +842,11 @@ const styles = StyleSheet.create({
     color: '#1D4949',
   },
   gridRowLeft: {
-    minHeight: 80,
+    height: 80,
     justifyContent: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   gridRowLocation: {
     fontSize: 14,
@@ -811,10 +869,11 @@ const styles = StyleSheet.create({
   },
   gridHeaderWeeks: {
     flexDirection: 'row',
+    height: 48,
     borderBottomWidth: 1,
     borderBottomColor: '#E8D5D5',
-    paddingBottom: 8,
     marginBottom: 8,
+    alignItems: 'center',
   },
   gridHeaderWeek: {
     width: 100,
@@ -822,7 +881,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 40,
   },
   gridHeaderWeekText: {
     fontSize: 12,
@@ -831,10 +889,11 @@ const styles = StyleSheet.create({
   },
   gridRowWeeks: {
     flexDirection: 'row',
+    height: 80,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
-    paddingVertical: 12,
-    minHeight: 80,
+    paddingVertical: 8,
+    alignItems: 'center',
   },
   gridCell: {
     width: 100,
