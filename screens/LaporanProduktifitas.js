@@ -362,28 +362,22 @@ export default function LaporanProduktifitasPage() {
       });
 
       // Calculate average per week and sort by week number
-      return Object.entries(weekBuckets)
-        .map(([weekNum, bucket]) => {
-          const week = Number(weekNum);
-          // Determine display label based on row type
-          let displayLabel;
-          if (isOverall) {
-            // For Overall row, show dates from period_label or extract from period_key
-            // period_label format: "2024/12/31 to 2025/01/06" -> show "2025/01/01" (start date formatted)
-            // or period_key might be the date directly
-            displayLabel = formatPeriodLabel(bucket.periodLabel, bucket.periodKey);
-          } else {
-            // For location rows, show "week X" from the original period_key
-            displayLabel = `week ${week}`;
-          }
+      return periodKeyOrder.map((week) => {
+        const bucket = weekBuckets[week];
 
-          return {
-            week: week,
-            value: bucket.values.reduce((a, b) => a + b, 0) / bucket.values.length,
-            displayLabel: displayLabel,
-          };
-        })
-        .sort((a, b) => a.week - b.week);
+        let displayLabel;
+        if (isOverall) {
+          displayLabel = formatPeriodLabel(bucket.periodLabel, bucket.periodKey);
+        } else {
+          displayLabel = `week ${week}`;
+        }
+
+        return {
+          week,
+          value: bucket.values.reduce((a, b) => a + b, 0) / bucket.values.length,
+          displayLabel,
+        };
+      });
     };
 
     // Helper to format period label for Overall row
