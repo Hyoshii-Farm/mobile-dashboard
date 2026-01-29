@@ -8,16 +8,16 @@ module.exports = {
       }
     },
     owner: "hyoshiifarm",
-    name: "hyoshiimobile",
+    name: "Hyoshii Grower",
     slug: "hyoshii-mobile",
-    version: "1.0.0",
+    version: "1.0.1",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
     newArchEnabled: true,
     scheme: "hyoshiiapp",
     splash: {
-      image: "./assets/splash-icon.png",
+      image: "./assets/splash-icon.svg",
       resizeMode: "contain",
       backgroundColor: "#ffffff"
     },
@@ -33,7 +33,7 @@ module.exports = {
       package: "com.hyoshiifarm.hyoshiimobile"
     },
     web: {
-      favicon: "./assets/favicon.png"
+      favicon: "./assets/favicon.ico"
     },
     plugins: [
       "expo-secure-store"

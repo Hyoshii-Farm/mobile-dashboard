@@ -92,7 +92,7 @@ export default function Home() {
 
       <HomeHeader
         title="HYOSHII FARM"
-        onLeftPress={() => {}}
+        onLeftPress={() => { }}
         profileContent={
           <TouchableOpacity style={styles.avatar} onPress={() => setMenuVisible(true)}>
             {profilePic ? (
@@ -162,7 +162,6 @@ export default function Home() {
             { iconSvg: placeholderSvg, label: 'Produksi', onPress: () => navigation.navigate('LaporanProduksi') },
             { iconSvg: placeholderSvg, label: 'Produktifitas', onPress: () => navigation.navigate('LaporanProduktifitas') },
             { iconSvg: placeholderSvg, label: 'Hama dan Penyakit', onPress: () => navigation.navigate('LaporanHPT') },
-            { iconSvg: placeholderSvg, label: 'Lokasi', onPress: () => {} },
           ]}
         />
       </ScrollView>
