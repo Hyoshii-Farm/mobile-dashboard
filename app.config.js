@@ -17,7 +17,7 @@ module.exports = {
     newArchEnabled: true,
     scheme: "hyoshiiapp",
     splash: {
-      image: "./assets/splash-icon.svg",
+      image: "./assets/splash-icon.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff"
     },
