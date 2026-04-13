@@ -113,7 +113,7 @@ export default function RejectPage() {
             return;
           }
           try {
-            const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
+            const url = `${API_BASE}/reject/${encodeURIComponent(id)}`;
             const res = await fetch(url, { method: 'DELETE', headers: authHeaders });
             const text = await res.text().catch(() => '');
             if (!res.ok) throw new Error(`DELETE failed ${res.status}: ${text}`);
@@ -137,7 +137,7 @@ export default function RejectPage() {
     setEditingId(null);
     setRefreshKey(prev => prev + 1);
   };
-  
+
   return (
     <View style={{ flex: 1 }}>
       <StatusBarCustom backgroundColor="#1D4949" />
@@ -147,20 +147,20 @@ export default function RejectPage() {
         onLeftPress={() => navigation.goBack()}
       />
       <View style={{ flex: 1, backgroundColor: COLORS.cream }}>
-        <ScrollView 
-          style={{ flex: 1 }} 
+        <ScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 20 }}
           showsVerticalScrollIndicator={false}
         >
-          <TambahForm 
-            editingId={editingId} 
+          <TambahForm
+            editingId={editingId}
             onSaved={handleSaved}
             onDeleted={handleDeleted}
           />
-          <RejectDataView 
+          <RejectDataView
             key={refreshKey}
-            authHeaders={authHeaders} 
-            onEdit={handleEdit} 
+            authHeaders={authHeaders}
+            onEdit={handleEdit}
             onDelete={handleDelete}
             refreshTrigger={refreshKey}
           />
@@ -186,7 +186,7 @@ function RejectDataView({ authHeaders, onEdit, onDelete, refreshTrigger }) {
     setError(null);
 
     try {
-      const url = `${API_BASE}/ops/reject?page=${page}&pageSize=${pageSize}&sortBy=Datetime:desc`;
+      const url = `${API_BASE}/reject?page=${page}&pageSize=${pageSize}&sortBy=Datetime:desc`;
       const response = await fetch(url, { headers: authHeaders });
 
       if (!response.ok) {
@@ -195,7 +195,7 @@ function RejectDataView({ authHeaders, onEdit, onDelete, refreshTrigger }) {
       }
 
       const result = await response.json();
-      
+
       let data = [];
       if (Array.isArray(result)) {
         data = result;
@@ -206,7 +206,7 @@ function RejectDataView({ authHeaders, onEdit, onDelete, refreshTrigger }) {
       } else if (Array.isArray(result?.results)) {
         data = result.results;
       }
-      
+
       const groupedArray = data.map(item => ({
         id: item.id || null,
         date: item.datetime || 'Unknown',
@@ -227,7 +227,7 @@ function RejectDataView({ authHeaders, onEdit, onDelete, refreshTrigger }) {
   const fetchLocations = useCallback(async () => {
     if (!authHeaders || !API_BASE) return;
     try {
-      const url = `${API_BASE}/location`;
+      const url = `${API_BASE}/location/list?org_code=org_b56b8313086`;
       const res = await fetch(url, { headers: authHeaders });
       if (!res.ok) return;
       const data = await res.json();
@@ -338,107 +338,107 @@ function RejectDataView({ authHeaders, onEdit, onDelete, refreshTrigger }) {
     <View>
       <View style={rejectStyles.tableContainer}>
         {rejectData.map((dateGroup, dateIndex) => {
-            const formattedDate = formatDate(dateGroup.datetime);
-            const locationList = (dateGroup.items || []).map(location => {
-              const reasons = location.reasons || [];
-              
-              const mappedDetails = reasons.map(r => ({
-                id: r.id || null,
-                reject_id: dateGroup.id || r.id || null,
-                reason_id: r.reason_id || null,
-                reason: r.reason_name || r.reason || null,
-                quantity: Number(r.quantity) || 0
-              }));
-              
-              return {
-                location_id: location.location_id || null,
-                location_name: location.location_name || 'Unknown Location',
-                details: mappedDetails,
-                totalQuantity: Number(location.quantity) || 0
-              };
-            });
+          const formattedDate = formatDate(dateGroup.datetime);
+          const locationList = (dateGroup.items || []).map(location => {
+            const reasons = location.reasons || [];
 
-            return (
-              <View key={dateIndex} style={rejectStyles.dateSection}>
-                <View style={rejectStyles.dateHeaderContainer}>
-                  <Text style={rejectStyles.dateHeader}>{formattedDate}</Text>
-                </View>
-                
-                <View style={rejectStyles.tableHeader}>
-                  <Text style={rejectStyles.headerText}>Lokasi</Text>
-                  <Text style={rejectStyles.headerText}>Kuantitas</Text>
-                </View>
+            const mappedDetails = reasons.map(r => ({
+              id: r.id || null,
+              reject_id: dateGroup.id || r.id || null,
+              reason_id: r.reason_id || null,
+              reason: r.reason_name || r.reason || null,
+              quantity: Number(r.quantity) || 0
+            }));
 
-                {locationList.map((location, locIndex) => {
-                  const rowKey = `${dateIndex}-${locIndex}`;
-                  const isExpanded = expandedRows[rowKey];
+            return {
+              location_id: location.location_id || null,
+              location_name: location.location_name || 'Unknown Location',
+              details: mappedDetails,
+              totalQuantity: Number(location.quantity) || 0
+            };
+          });
 
-                  return (
-                    <View key={rowKey}>
-                      <TouchableOpacity 
-                        style={rejectStyles.locationRow} 
-                        onPress={() => toggleExpanded(rowKey)}
-                      >
-                        <View style={rejectStyles.locationLeft}>
-                          <SvgXml 
-                            xml={isExpanded ? upArrowSvg : downArrowSvg} 
-                            width={12} 
-                            height={8} 
-                          />
-                          <Text style={rejectStyles.locationText}>{location.location_name}</Text>
-                        </View>
-                        <Text style={rejectStyles.quantityText}>{location.totalQuantity} gr</Text>
-                      </TouchableOpacity>
-
-                      {isExpanded && location.details.length > 0 && (
-                        <View style={rejectStyles.expandedSection}>
-                          <View style={rejectStyles.detailsHeader}>
-                            <Text style={rejectStyles.detailsHeaderText}>Alasan</Text>
-                            <Text style={rejectStyles.detailsHeaderText}>Kuantitas</Text>
-                            <Text style={rejectStyles.detailsHeaderText}>Menu</Text>
-                          </View>
-                          {location.details.map((detail, detailIndex) => (
-                            <View key={detail.id || detailIndex} style={rejectStyles.detailRow}>
-                              <Text style={rejectStyles.detailText}>
-                                {(detail.reason && detail.reason !== 'null') 
-                                  ? detail.reason 
-                                  : (getReasonName(detail.reason_id) || 'Unknown')}
-                              </Text>
-                              <Text style={rejectStyles.detailText}>{detail.quantity || 0} gr</Text>
-                              <View style={rejectStyles.actionButtons}>
-                                <TouchableOpacity 
-                                  style={rejectStyles.actionButton}
-                                  onPress={() => {
-                                    const recordId = detail.reject_id || dateGroup.id || detail.id;
-                                    if (onEdit && recordId) {
-                                      onEdit(recordId);
-                                    }
-                                  }}
-                                >
-                                  <SvgXml xml={editIconSvg} width={16} height={16} />
-                                </TouchableOpacity>
-                                <TouchableOpacity 
-                                  style={rejectStyles.actionButton}
-                                  onPress={() => {
-                                    const recordId = detail.reject_id || dateGroup.id || detail.id;
-                                    if (onDelete && recordId) {
-                                      onDelete(recordId);
-                                    }
-                                  }}
-                                >
-                                  <SvgXml xml={deleteIconSvg} width={16} height={16} />
-                                </TouchableOpacity>
-                              </View>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
+          return (
+            <View key={dateIndex} style={rejectStyles.dateSection}>
+              <View style={rejectStyles.dateHeaderContainer}>
+                <Text style={rejectStyles.dateHeader}>{formattedDate}</Text>
               </View>
-            );
-          })}
+
+              <View style={rejectStyles.tableHeader}>
+                <Text style={rejectStyles.headerText}>Lokasi</Text>
+                <Text style={rejectStyles.headerText}>Kuantitas</Text>
+              </View>
+
+              {locationList.map((location, locIndex) => {
+                const rowKey = `${dateIndex}-${locIndex}`;
+                const isExpanded = expandedRows[rowKey];
+
+                return (
+                  <View key={rowKey}>
+                    <TouchableOpacity
+                      style={rejectStyles.locationRow}
+                      onPress={() => toggleExpanded(rowKey)}
+                    >
+                      <View style={rejectStyles.locationLeft}>
+                        <SvgXml
+                          xml={isExpanded ? upArrowSvg : downArrowSvg}
+                          width={12}
+                          height={8}
+                        />
+                        <Text style={rejectStyles.locationText}>{location.location_name}</Text>
+                      </View>
+                      <Text style={rejectStyles.quantityText}>{location.totalQuantity} gr</Text>
+                    </TouchableOpacity>
+
+                    {isExpanded && location.details.length > 0 && (
+                      <View style={rejectStyles.expandedSection}>
+                        <View style={rejectStyles.detailsHeader}>
+                          <Text style={rejectStyles.detailsHeaderText}>Alasan</Text>
+                          <Text style={rejectStyles.detailsHeaderText}>Kuantitas</Text>
+                          <Text style={rejectStyles.detailsHeaderText}>Menu</Text>
+                        </View>
+                        {location.details.map((detail, detailIndex) => (
+                          <View key={detail.id || detailIndex} style={rejectStyles.detailRow}>
+                            <Text style={rejectStyles.detailText}>
+                              {(detail.reason && detail.reason !== 'null')
+                                ? detail.reason
+                                : (getReasonName(detail.reason_id) || 'Unknown')}
+                            </Text>
+                            <Text style={rejectStyles.detailText}>{detail.quantity || 0} gr</Text>
+                            <View style={rejectStyles.actionButtons}>
+                              <TouchableOpacity
+                                style={rejectStyles.actionButton}
+                                onPress={() => {
+                                  const recordId = detail.reject_id || dateGroup.id || detail.id;
+                                  if (onEdit && recordId) {
+                                    onEdit(recordId);
+                                  }
+                                }}
+                              >
+                                <SvgXml xml={editIconSvg} width={16} height={16} />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={rejectStyles.actionButton}
+                                onPress={() => {
+                                  const recordId = detail.reject_id || dateGroup.id || detail.id;
+                                  if (onDelete && recordId) {
+                                    onDelete(recordId);
+                                  }
+                                }}
+                              >
+                                <SvgXml xml={deleteIconSvg} width={16} height={16} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          );
+        })}
       </View>
       <RejectPagination pagination={pagination} onPageChange={handlePageChange} />
     </View>
@@ -450,7 +450,7 @@ function RejectPagination({ pagination, onPageChange }) {
 
   return (
     <View style={rejectStyles.pagination}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={rejectStyles.pageButton}
         onPress={() => onPageChange(1)}
         disabled={pagination.page === 1}
@@ -459,7 +459,7 @@ function RejectPagination({ pagination, onPageChange }) {
           {"<<"}
         </Text>
       </TouchableOpacity>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={rejectStyles.pageButton}
         onPress={() => onPageChange(pagination.page - 1)}
         disabled={pagination.page === 1}
@@ -473,7 +473,7 @@ function RejectPagination({ pagination, onPageChange }) {
           {pagination.page}
         </Text>
       </TouchableOpacity>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={rejectStyles.pageButton}
         onPress={() => onPageChange(pagination.page + 1)}
         disabled={pagination.page >= pagination.totalPages}
@@ -482,7 +482,7 @@ function RejectPagination({ pagination, onPageChange }) {
           {">"}
         </Text>
       </TouchableOpacity>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={rejectStyles.pageButton}
         onPress={() => onPageChange(pagination.totalPages)}
         disabled={pagination.page >= pagination.totalPages}
@@ -495,7 +495,7 @@ function RejectPagination({ pagination, onPageChange }) {
   );
 }
 
-function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {} }) {
+function TambahForm({ editingId = null, onSaved = () => { }, onDeleted = () => { } }) {
   const [showForm, setShowForm] = useState(false);
   const formAnimation = useRef(new Animated.Value(0)).current;
   const [loading, setLoading] = useState(false);
@@ -531,11 +531,11 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
       // Add one initial jenis field
       const reason = rejectReasons[0];
       if (reason) {
-        setDaftarRejects([{ 
-          id: `initial-${Date.now()}`, 
+        setDaftarRejects([{
+          id: `initial-${Date.now()}`,
           reason_id: reason.id,
           jenis: reason.name || reason.label || '',
-          kuantitas: '' 
+          kuantitas: ''
         }]);
       }
     }
@@ -579,7 +579,7 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
   // Debounced search for locations - call API when search query changes
   useEffect(() => {
     if (!showLocationModal) return;
-    
+
     const timeoutId = setTimeout(() => {
       fetchLocations(locationSearchQuery);
     }, 300); // 300ms debounce
@@ -590,7 +590,7 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
   // Debounced search for reject reasons - call API when search query changes
   useEffect(() => {
     if (!showRejectReasonModal) return;
-    
+
     const timeoutId = setTimeout(() => {
       fetchRejectReasons(rejectReasonSearchQuery);
     }, 300); // 300ms debounce
@@ -670,7 +670,7 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     if (!API_BASE) return;
     try {
       const headers = await makeHeaders();
-      const url = `${API_BASE}/location/dropdown?search&concise=true&nursery=false&pageSize=100`;
+      const url = `${API_BASE}/location/list?search&concise=true&nursery=false&pageSize=100&org_code=org_b56b8313086`;
       const res = await fetch(url, { method: 'GET', headers });
       if (!res.ok) throw new Error(`GET failed: ${res.status}`);
       const data = await res.json();
@@ -725,7 +725,7 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     const details = record.details || [];
     const total = details.reduce((sum, d) => sum + (Number(d.quantity) || 0), 0);
     setTotalReject(String(total));
-    
+
     if (record.datetime) {
       const parsed = new Date(record.datetime);
       if (!isNaN(parsed.getTime())) {
@@ -743,12 +743,12 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     setLokasiId(record.location_id || null);
     const location = locations.find(loc => loc.id === record.location_id);
     setLokasi(location ? location.name : '');
-    
+
     // Check if we need to repopulate when locations/rejectReasons load
     if (record.location_id && !location) {
       setNeedsRepopulate(true);
     }
-    
+
     const mappedRejects = details.map((d, i) => {
       const reason = rejectReasons.find(r => r.id === d.reason_id);
       if (d.reason_id && !reason) {
@@ -776,15 +776,15 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     const today = new Date();
     setDateObj(today);
     setTanggal(formatDate(today));
-    
+
     // Add one initial jenis field after reset if rejectReasons are available
     if (rejectReasons.length > 0 && !editingId) {
       const reason = rejectReasons[0];
-      setDaftarRejects([{ 
-        id: `initial-${Date.now()}`, 
+      setDaftarRejects([{
+        id: `initial-${Date.now()}`,
         reason_id: reason.id,
         jenis: reason.name || reason.label || '',
-        kuantitas: '' 
+        kuantitas: ''
       }]);
     }
   }
@@ -795,11 +795,11 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     }
     if (reasonId) {
       const reason = rejectReasons.find(r => r.id === reasonId);
-      setDaftarRejects((prev) => [...prev, { 
-        id: `${Date.now()}-${Math.random()}`, 
+      setDaftarRejects((prev) => [...prev, {
+        id: `${Date.now()}-${Math.random()}`,
         reason_id: reasonId,
         jenis: reason ? reason.name : '',
-        kuantitas: String(kuantitas) 
+        kuantitas: String(kuantitas)
       }]);
     }
   }
@@ -834,16 +834,16 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     setLoading(true);
     try {
       const headers = await makeHeaders();
-      const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
+      const url = `${API_BASE}/reject/${encodeURIComponent(id)}`;
       const res = await fetch(url, { method: 'GET', headers });
       const text = await res.text().catch(() => '');
       if (!res.ok) {
         throw new Error(`GET failed: ${res.status} ${text}`);
       }
       const data = safeParseJson(text) ?? null;
-      
+
       let record = data;
-      
+
       if (data && data.locations && Array.isArray(data.locations) && data.locations.length > 0) {
         const firstLocation = data.locations[0];
         record = {
@@ -876,7 +876,7 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
       } else if (data && data.locations) {
         setEditingRecordType('grouped');
       }
-      
+
       if (record) {
         populateFormFromRecord(record);
       } else {
@@ -898,7 +898,7 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     setLoading(true);
     try {
       const payload = buildPayloadForApi();
-      const url = `${API_BASE}/ops/reject`;
+      const url = `${API_BASE}/reject`;
       const headers = await makeHeaders();
       const res = await fetch(url, {
         method: 'POST',
@@ -933,7 +933,7 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
     setLoading(true);
     try {
       const payload = buildPayloadForApi(true);
-      const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
+      const url = `${API_BASE}/reject/${encodeURIComponent(id)}`;
       const headers = await makeHeaders();
       const res = await fetch(url, {
         method: 'PUT',
@@ -973,7 +973,7 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
           }
           setLoading(true);
           try {
-            const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
+            const url = `${API_BASE}/reject/${encodeURIComponent(id)}`;
             const headers = await makeHeaders();
             const res = await fetch(url, { method: 'DELETE', headers });
             const text = await res.text().catch(() => '');
@@ -1041,259 +1041,259 @@ function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {}
 
   return (
     <View>
-        {/* Tambah Button */}
-        <TouchableOpacity style={styles.addButton} onPress={() => {
-          const newShowForm = !showForm;
-          setShowForm(newShowForm);
-          // When opening form for new entry (not editing), ensure date defaults to today
-          if (newShowForm && !editingId) {
-            const today = new Date();
-            setDateObj(today);
-            setTanggal(formatDate(today));
-          }
-        }}>
-          <Text style={styles.addButtonText}>{showForm ? 'Tutup' : '+ Tambah'}</Text>
-        </TouchableOpacity>
+      {/* Tambah Button */}
+      <TouchableOpacity style={styles.addButton} onPress={() => {
+        const newShowForm = !showForm;
+        setShowForm(newShowForm);
+        // When opening form for new entry (not editing), ensure date defaults to today
+        if (newShowForm && !editingId) {
+          const today = new Date();
+          setDateObj(today);
+          setTanggal(formatDate(today));
+        }
+      }}>
+        <Text style={styles.addButtonText}>{showForm ? 'Tutup' : '+ Tambah'}</Text>
+      </TouchableOpacity>
 
-        {/* Animated Form Section */}
-        {showForm && (
-          <Animated.View style={{ opacity: formAnimation, overflow: 'visible', marginHorizontal: 16, marginTop: 10 }}>
-            <View style={styles.formPanel}>
-              {/* Loading overlay */}
-              {loading && (
-                <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.6)' }}>
-                  <ActivityIndicator size="large" color={COLORS.green} />
-                </View>
-              )}
-
-              {/* Form Content */}
-              <View style={styles.formRow}>
-                <Text style={styles.formLabel}>Total Reject</Text>
-                <View style={styles.formInputWrapper}>
-                  <TextInput 
-                    style={[styles.formInput, { backgroundColor: COLORS.gray }]} 
-                    value={totalReject} 
-                    editable={false}
-                    placeholder="0" 
-                  />
-                  <Text style={styles.formUnit}>gram</Text>
-                </View>
+      {/* Animated Form Section */}
+      {showForm && (
+        <Animated.View style={{ opacity: formAnimation, overflow: 'visible', marginHorizontal: 16, marginTop: 10 }}>
+          <View style={styles.formPanel}>
+            {/* Loading overlay */}
+            {loading && (
+              <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 10, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.6)' }}>
+                <ActivityIndicator size="large" color={COLORS.green} />
               </View>
+            )}
 
-              {/* Tanggal */}
-              <View style={styles.formRow}>
-                <Text style={styles.formLabel}>Tanggal*</Text>
-                <View style={styles.formInputRow}>
-                  <TouchableOpacity style={[styles.formInput, { justifyContent: 'center' }]} onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
-                    <Text style={{ color: tanggal ? '#000' : '#888' }}>{tanggal || 'Pilih tanggal'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.formIconTouchable}>
-                    <Icon name="calendar" size={22} color={COLORS.green} />
-                  </TouchableOpacity>
-                </View>
-
-                {showDatePicker && (
-                  <DateTimePicker value={dateObj || new Date()} mode="date" display="calendar" onChange={onChangeDate} maximumDate={new Date(2100, 11, 31)} minimumDate={new Date(2000, 0, 1)} />
-                )}
+            {/* Form Content */}
+            <View style={styles.formRow}>
+              <Text style={styles.formLabel}>Total Reject</Text>
+              <View style={styles.formInputWrapper}>
+                <TextInput
+                  style={[styles.formInput, { backgroundColor: COLORS.gray }]}
+                  value={totalReject}
+                  editable={false}
+                  placeholder="0"
+                />
+                <Text style={styles.formUnit}>gram</Text>
               </View>
+            </View>
 
-              {/* Lokasi */}
-              <View style={styles.formRow}>
-                <Text style={styles.formLabel}>Lokasi*</Text>
-                <TouchableOpacity 
-                  style={{ borderWidth: 1, borderColor: COLORS.green, borderRadius: 4, height: 48, justifyContent: 'center', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }}
-                  onPress={() => {
-                    setLocationSearchQuery('');
-                    setShowLocationModal(true);
-                  }}
-                >
-                  <Text style={{ flex: 1, color: lokasi ? '#000' : '#888' }}>
-                    {lokasi || 'Pilih lokasi...'}
-                  </Text>
-                  <SvgXml xml={downArrowSvg} width={12} height={8} />
+            {/* Tanggal */}
+            <View style={styles.formRow}>
+              <Text style={styles.formLabel}>Tanggal*</Text>
+              <View style={styles.formInputRow}>
+                <TouchableOpacity style={[styles.formInput, { justifyContent: 'center' }]} onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
+                  <Text style={{ color: tanggal ? '#000' : '#888' }}>{tanggal || 'Pilih tanggal'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.formIconTouchable}>
+                  <Icon name="calendar" size={22} color={COLORS.green} />
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.separator} />
+              {showDatePicker && (
+                <DateTimePicker value={dateObj || new Date()} mode="date" display="calendar" onChange={onChangeDate} maximumDate={new Date(2100, 11, 31)} minimumDate={new Date(2000, 0, 1)} />
+              )}
+            </View>
 
-              {/* Daftar Reject Section */}
-              <Text style={styles.subFormTitle}>DAFTAR REJECT</Text>
-              <View style={styles.subFormHeader}>
-                <Text style={[styles.subFormLabel, { marginLeft: 1 }]}>Jenis</Text>
-                <Text style={styles.subFormLabel}>Kuantitas (gram)</Text>
-              </View>
-
-              {daftarRejects.map((item) => (
-                <View key={item.id} style={styles.subFormRow}>
-                  <View style={styles.dropdown}>
-                    <TouchableOpacity 
-                      style={{ flex: 1, borderWidth: 1, borderColor: COLORS.darkGray, borderRadius: 4, height: 40, justifyContent: 'center', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }}
-                      onPress={() => {
-                        setRejectReasonSearchQuery('');
-                        setShowRejectReasonModal(item.id);
-                      }}
-                    >
-                      <Text style={{ flex: 1, color: item.jenis ? '#000' : '#888', fontSize: 15 }}>
-                        {item.jenis || 'Pilih jenis...'}
-                      </Text>
-                      <SvgXml xml={downArrowSvg} width={12} height={8} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removeJenis(item.id)} style={{ marginLeft: 8 }}>
-                      <Icon name="close" size={16} color={COLORS.green} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.quantityInputRow}>
-                    <TextInput 
-                      placeholder="Kuantitas (gram)" 
-                      style={styles.quantityInput} 
-                      keyboardType="numeric" 
-                      value={String(item.kuantitas)} 
-                      onChangeText={(text) => updateJenis(item.id, 'kuantitas', text.replace(/[^0-9]/g, ''))} 
-                    />
-                  </View>
-                </View>
-              ))}
-
-              <TouchableOpacity 
-                style={styles.addJenisButton} 
+            {/* Lokasi */}
+            <View style={styles.formRow}>
+              <Text style={styles.formLabel}>Lokasi*</Text>
+              <TouchableOpacity
+                style={{ borderWidth: 1, borderColor: COLORS.green, borderRadius: 4, height: 48, justifyContent: 'center', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }}
                 onPress={() => {
-                  if (rejectReasons.length > 0) {
-                    addJenis(rejectReasons[0].id, '');
-                  }
+                  setLocationSearchQuery('');
+                  setShowLocationModal(true);
                 }}
               >
-                <Text style={styles.addJenisButtonText}>+ Jenis Lain</Text>
+                <Text style={{ flex: 1, color: lokasi ? '#000' : '#888' }}>
+                  {lokasi || 'Pilih lokasi...'}
+                </Text>
+                <SvgXml xml={downArrowSvg} width={12} height={8} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.separator} />
+
+            {/* Daftar Reject Section */}
+            <Text style={styles.subFormTitle}>DAFTAR REJECT</Text>
+            <View style={styles.subFormHeader}>
+              <Text style={[styles.subFormLabel, { marginLeft: 1 }]}>Jenis</Text>
+              <Text style={styles.subFormLabel}>Kuantitas (gram)</Text>
+            </View>
+
+            {daftarRejects.map((item) => (
+              <View key={item.id} style={styles.subFormRow}>
+                <View style={styles.dropdown}>
+                  <TouchableOpacity
+                    style={{ flex: 1, borderWidth: 1, borderColor: COLORS.darkGray, borderRadius: 4, height: 40, justifyContent: 'center', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }}
+                    onPress={() => {
+                      setRejectReasonSearchQuery('');
+                      setShowRejectReasonModal(item.id);
+                    }}
+                  >
+                    <Text style={{ flex: 1, color: item.jenis ? '#000' : '#888', fontSize: 15 }}>
+                      {item.jenis || 'Pilih jenis...'}
+                    </Text>
+                    <SvgXml xml={downArrowSvg} width={12} height={8} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => removeJenis(item.id)} style={{ marginLeft: 8 }}>
+                    <Icon name="close" size={16} color={COLORS.green} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.quantityInputRow}>
+                  <TextInput
+                    placeholder="Kuantitas (gram)"
+                    style={styles.quantityInput}
+                    keyboardType="numeric"
+                    value={String(item.kuantitas)}
+                    onChangeText={(text) => updateJenis(item.id, 'kuantitas', text.replace(/[^0-9]/g, ''))}
+                  />
+                </View>
+              </View>
+            ))}
+
+            <TouchableOpacity
+              style={styles.addJenisButton}
+              onPress={() => {
+                if (rejectReasons.length > 0) {
+                  addJenis(rejectReasons[0].id, '');
+                }
+              }}
+            >
+              <Text style={styles.addJenisButtonText}>+ Jenis Lain</Text>
+            </TouchableOpacity>
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
+                <Text style={styles.saveButtonText}>{editingId ? 'Perbarui' : 'Simpan'}</Text>
               </TouchableOpacity>
 
-              {/* Action Buttons */}
-              <View style={styles.actionButtonsRow}>
-                <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
-                  <Text style={styles.saveButtonText}>{editingId ? 'Perbarui' : 'Simpan'}</Text>
+              {editingId ? (
+                <TouchableOpacity style={styles.resetButton} onPress={() => deleteRecord(editingId)} disabled={loading}>
+                  <Text style={styles.resetButtonText}>Hapus</Text>
                 </TouchableOpacity>
-
-                {editingId ? (
-                  <TouchableOpacity style={styles.resetButton} onPress={() => deleteRecord(editingId)} disabled={loading}>
-                    <Text style={styles.resetButtonText}>Hapus</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity style={styles.resetButton} onPress={() => resetForm()} disabled={loading}>
-                    <Text style={styles.resetButtonText}>Reset</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+              ) : (
+                <TouchableOpacity style={styles.resetButton} onPress={() => resetForm()} disabled={loading}>
+                  <Text style={styles.resetButtonText}>Reset</Text>
+                </TouchableOpacity>
+              )}
             </View>
-          </Animated.View>
-        )}
+          </View>
+        </Animated.View>
+      )}
 
-        {/* Location Modal */}
-        <Modal
-          visible={showLocationModal}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowLocationModal(false)}
+      {/* Location Modal */}
+      <Modal
+        visible={showLocationModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLocationModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowLocationModal(false)}
         >
-          <TouchableOpacity 
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setShowLocationModal(false)}
-          >
-            <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Pilih Lokasi</Text>
-                <TouchableOpacity onPress={() => setShowLocationModal(false)}>
-                  <Icon name="close" size={24} color={COLORS.darkGray} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                style={styles.modalSearchInput}
-                placeholder="Type to search..."
-                value={locationSearchQuery}
-                onChangeText={setLocationSearchQuery}
-                autoFocus={false}
-              />
-              <ScrollView 
-                style={styles.modalScrollView}
-                keyboardShouldPersistTaps="handled"
-              >
-                {filteredLocations.map((loc) => (
-                  <TouchableOpacity
-                    key={loc.id}
-                    style={styles.modalOption}
-                    onPress={() => {
-                      setLokasiId(loc.id);
-                      setLokasi(loc.name || loc.label || String(loc));
-                      setShowLocationModal(false);
-                      setLocationSearchQuery('');
-                    }}
-                  >
-                    <Text style={styles.modalOptionText}>
-                      {loc.name || loc.label || String(loc)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                {filteredLocations.length === 0 && (
-                  <Text style={styles.modalNoResults}>No results found</Text>
-                )}
-              </ScrollView>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Pilih Lokasi</Text>
+              <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+                <Icon name="close" size={24} color={COLORS.darkGray} />
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </Modal>
+            <TextInput
+              style={styles.modalSearchInput}
+              placeholder="Type to search..."
+              value={locationSearchQuery}
+              onChangeText={setLocationSearchQuery}
+              autoFocus={false}
+            />
+            <ScrollView
+              style={styles.modalScrollView}
+              keyboardShouldPersistTaps="handled"
+            >
+              {filteredLocations.map((loc) => (
+                <TouchableOpacity
+                  key={loc.id}
+                  style={styles.modalOption}
+                  onPress={() => {
+                    setLokasiId(loc.id);
+                    setLokasi(loc.name || loc.label || String(loc));
+                    setShowLocationModal(false);
+                    setLocationSearchQuery('');
+                  }}
+                >
+                  <Text style={styles.modalOptionText}>
+                    {loc.name || loc.label || String(loc)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {filteredLocations.length === 0 && (
+                <Text style={styles.modalNoResults}>No results found</Text>
+              )}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
-        {/* Reject Reason Modal */}
-        <Modal
-          visible={showRejectReasonModal !== null}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowRejectReasonModal(null)}
+      {/* Reject Reason Modal */}
+      <Modal
+        visible={showRejectReasonModal !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowRejectReasonModal(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowRejectReasonModal(null)}
         >
-          <TouchableOpacity 
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setShowRejectReasonModal(null)}
-          >
-            <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Pilih Jenis</Text>
-                <TouchableOpacity onPress={() => setShowRejectReasonModal(null)}>
-                  <Icon name="close" size={24} color={COLORS.darkGray} />
-                </TouchableOpacity>
-              </View>
-              <TextInput
-                style={styles.modalSearchInput}
-                placeholder="Type to search..."
-                value={rejectReasonSearchQuery}
-                onChangeText={setRejectReasonSearchQuery}
-                autoFocus={false}
-              />
-              <ScrollView 
-                style={styles.modalScrollView}
-                keyboardShouldPersistTaps="handled"
-              >
-                {filteredRejectReasons.map((reason) => (
-                  <TouchableOpacity
-                    key={reason.id}
-                    style={styles.modalOption}
-                    onPress={() => {
-                      if (showRejectReasonModal) {
-                        updateJenis(showRejectReasonModal, 'reason_id', reason.id);
-                      }
-                      setShowRejectReasonModal(null);
-                      setRejectReasonSearchQuery('');
-                    }}
-                  >
-                    <Text style={styles.modalOptionText}>
-                      {reason.name || reason.label || String(reason)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                {filteredRejectReasons.length === 0 && (
-                  <Text style={styles.modalNoResults}>No results found</Text>
-                )}
-              </ScrollView>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Pilih Jenis</Text>
+              <TouchableOpacity onPress={() => setShowRejectReasonModal(null)}>
+                <Icon name="close" size={24} color={COLORS.darkGray} />
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-        </Modal>
+            <TextInput
+              style={styles.modalSearchInput}
+              placeholder="Type to search..."
+              value={rejectReasonSearchQuery}
+              onChangeText={setRejectReasonSearchQuery}
+              autoFocus={false}
+            />
+            <ScrollView
+              style={styles.modalScrollView}
+              keyboardShouldPersistTaps="handled"
+            >
+              {filteredRejectReasons.map((reason) => (
+                <TouchableOpacity
+                  key={reason.id}
+                  style={styles.modalOption}
+                  onPress={() => {
+                    if (showRejectReasonModal) {
+                      updateJenis(showRejectReasonModal, 'reason_id', reason.id);
+                    }
+                    setShowRejectReasonModal(null);
+                    setRejectReasonSearchQuery('');
+                  }}
+                >
+                  <Text style={styles.modalOptionText}>
+                    {reason.name || reason.label || String(reason)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {filteredRejectReasons.length === 0 && (
+                <Text style={styles.modalNoResults}>No results found</Text>
+              )}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

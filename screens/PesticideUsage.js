@@ -18,30 +18,29 @@ import SortableTable from '../components/SortableTable';
 
 // Configuration constants
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
-const API_BASE_2 = process.env.LOCATION_API_BASE;
 const PAGE_SIZE = 10;
 const MAX_PAGES = 200;
 
 // API endpoint candidates for different data types
 const CANDIDATE_ENDPOINTS = {
-  lokasi: ['/location/dropdown'],
-  hama: ['/hama', '/pest'],
+  lokasi: ['/location/list'],
+  hama: ['/hama'],
   pestisida: ['/pesticide'],
 };
 
 // Default selected columns for the table
 const DEFAULT_SELECTED_COLUMNS = [
-  'Tanggal & Waktu', 
-  'Lokasi', 
-  'Hama', 
-  'Pestisida', 
+  'Tanggal & Waktu',
+  'Lokasi',
+  'Hama',
+  'Pestisida',
   'Actions'
 ];
 
 // Available table column options
 const TABLE_COLUMN_OPTIONS = [
-  'No.', 'Tanggal & Waktu', 'Lokasi', 'Hama', 'Pestisida', 'Dosis', 
-  'Penggunaan', 'Mulai', 'Selesai', 'Durasi', 'Perawatan', 
+  'No.', 'Tanggal & Waktu', 'Lokasi', 'Hama', 'Pestisida', 'Dosis',
+  'Penggunaan', 'Mulai', 'Selesai', 'Durasi', 'Perawatan',
   'Penanggung Jawab', 'Tenaga Kerja', 'Suhu', 'Gambar', 'Deskripsi', 'Actions'
 ];
 
@@ -66,7 +65,7 @@ export default function PesticideUsagePage() {
 
   const getAuthHeaders = useCallback(async () => {
     if (!isAuthenticated) {
-      await login().catch(() => {});
+      await login().catch(() => { });
     }
     const token = await getAccessToken(process.env.EXPO_PUBLIC_KINDE_AUDIENCE);
     return {
@@ -78,28 +77,28 @@ export default function PesticideUsagePage() {
 
   const [showFilters, setShowFilters] = useState(false);
 
-  const [selectedLocation, setSelectedLocation]   = useState('');
-  const [selectedPest, setSelectedPest]           = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedPest, setSelectedPest] = useState('');
   const [selectedPesticide, setSelectedPesticide] = useState('');
 
   const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate]     = useState(null);
+  const [endDate, setEndDate] = useState(null);
   const [showStart, setShowStart] = useState(false);
-  const [showEnd, setShowEnd]     = useState(false);
-  const [doseFrom, setDoseFrom]   = useState('');
-  const [doseTo, setDoseTo]       = useState('');
-  const [tempFrom, setTempFrom]   = useState('');
-  const [tempTo, setTempTo]       = useState('');
+  const [showEnd, setShowEnd] = useState(false);
+  const [doseFrom, setDoseFrom] = useState('');
+  const [doseTo, setDoseTo] = useState('');
+  const [tempFrom, setTempFrom] = useState('');
+  const [tempTo, setTempTo] = useState('');
   const [selectedColumns, setSelectedColumns] = useState(DEFAULT_SELECTED_COLUMNS);
 
   const [dropdownOpen, setDropdownOpen] = useState({ lokasi: false, hama: false, pestisida: false });
 
-  const [lokasiOptions, setLokasiOptions]       = useState([]);
-  const [hamaOptions, setHamaOptions]           = useState([]);
+  const [lokasiOptions, setLokasiOptions] = useState([]);
+  const [hamaOptions, setHamaOptions] = useState([]);
   const [pestisidaOptions, setPestisidaOptions] = useState([]);
 
   const [loading, setLoading] = useState({ lokasi: false, hama: false, pestisida: false });
-  const [error, setError]     = useState(null);
+  const [error, setError] = useState(null);
   const [authHeaders, setAuthHeaders] = useState(null);
 
 
@@ -132,7 +131,8 @@ export default function PesticideUsagePage() {
     const params = new URLSearchParams();
     if (pageSize) params.set('pageSize', String(pageSize));
     if (page) params.set('page', String(page));
-    const base = path === '/location' ? API_BASE_2_ : API_BASE;
+    if (path === '/location/list') params.set('org_code', 'org_b56b8313086');
+    const base = path === '/location' ? API_BASE : API_BASE;
     return `${base}${path}?${params.toString()}`;
   };
 
@@ -151,15 +151,15 @@ export default function PesticideUsagePage() {
     while (page <= MAX_PAGES) {
       const url = buildUrl(path, page, pageSize);
       const res = await fetch(url, { headers });
-      
+
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
         throw new Error(`${res.status} ${res.statusText} ${txt}`.trim());
       }
-      
+
       const responseText = await res.text();
       let data;
-      
+
       try {
         data = JSON.parse(responseText);
       } catch (parseError) {
@@ -202,7 +202,7 @@ export default function PesticideUsagePage() {
 
         if (key === 'pestisida') {
           const labels = all.map((x) => (x?.name ?? toLabel(x)) || 'Unknown')
-                            .sort((a, b) => a.localeCompare(b));
+            .sort((a, b) => a.localeCompare(b));
           setPestisidaOptions(labels);
         } else {
           let labels = all.map(toLabel).filter((s) => typeof s === 'string' && s.trim().length > 0);
@@ -211,7 +211,7 @@ export default function PesticideUsagePage() {
           }
           const uniqueSorted = Array.from(new Set(labels)).sort((a, b) => a.localeCompare(b));
           if (key === 'lokasi') setLokasiOptions(uniqueSorted);
-          if (key === 'hama')   setHamaOptions(uniqueSorted);
+          if (key === 'hama') setHamaOptions(uniqueSorted);
         }
 
         return;
@@ -236,7 +236,7 @@ export default function PesticideUsagePage() {
     } catch (error) {
       console.error('Failed to get auth headers:', error);
     }
-    
+
     await Promise.all([
       fetchOptions('lokasi'),
       fetchOptions('hama'),
@@ -276,19 +276,19 @@ export default function PesticideUsagePage() {
             style={[styles.filterButton, { marginTop: 12 }]}
             onPress={() => setShowFilters(!showFilters)}
           >
-          <Text style={styles.filterButtonText}>{showFilters ? 'Hide Filters' : 'Show Filters'}</Text>
+            <Text style={styles.filterButtonText}>{showFilters ? 'Hide Filters' : 'Show Filters'}</Text>
           </TouchableOpacity>
 
           <CollapsibleMultiselect
-                label="Kolom"
-                items={TABLE_COLUMN_OPTIONS}
-                selectedItems={selectedColumns}
-                onToggle={(item) =>
-                  setSelectedColumns((prev) =>
-                    prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-                  )
-                }
-              />
+            label="Kolom"
+            items={TABLE_COLUMN_OPTIONS}
+            selectedItems={selectedColumns}
+            onToggle={(item) =>
+              setSelectedColumns((prev) =>
+                prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
+              )
+            }
+          />
 
           {showFilters && (
             <View style={styles.formSection}>
@@ -357,7 +357,7 @@ export default function PesticideUsagePage() {
                 setFromValue={(val) => setTempFrom(val.replace(/[^0-9]/g, ''))}
                 setToValue={(val) => setTempTo(val.replace(/[^0-9]/g, ''))}
               />
-              
+
             </View>
           )}
 
@@ -410,9 +410,9 @@ const styles = StyleSheet.create({
   },
 
   tableTitle: {
-    fontSize: 16, 
-    fontWeight: '700', 
-    color: '#8B0000', 
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#8B0000',
     marginTop: 8,
     marginBottom: 4,
   },

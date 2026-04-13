@@ -29,14 +29,14 @@ const COLORS = {
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
 
-export default function TambahForm({ editingId = null, onSaved = () => {}, onDeleted = () => {} }) {
+export default function TambahForm({ editingId = null, onSaved = () => { }, onDeleted = () => { } }) {
   const [showForm, setShowForm] = useState(false);
   const formAnimation = useRef(new Animated.Value(0)).current;
   const [loading, setLoading] = useState(false);
   const [tanggal, setTanggal] = useState('');
-  const [lokasi, setLokasi] = useState(''); 
+  const [lokasi, setLokasi] = useState('');
   const [lokasiId, setLokasiId] = useState(null);
-  const [daftarRejects, setDaftarRejects] = useState([]); 
+  const [daftarRejects, setDaftarRejects] = useState([]);
   const [locations, setLocations] = useState([]);
   const [hamaOptions, setHamaOptions] = useState([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -181,7 +181,7 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
     setLokasiId(record.location_id || null);
     const location = locations.find(loc => loc.id === record.location_id);
     setLokasi(location ? location.name : '');
-    
+
     setDaftarRejects(
       (record.details || []).map((d) => ({
         id: d.id,
@@ -205,11 +205,11 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
 
   function addJenis(jenisId = null, kuantitas = '') {
     if (!jenisId) return;
-    setDaftarRejects(prev => [...prev, { 
-      id: `temp-${Date.now()}-${Math.random()}`, 
+    setDaftarRejects(prev => [...prev, {
+      id: `temp-${Date.now()}-${Math.random()}`,
       jenis_id: jenisId,
       jenis: hamaOptions.find(h => h.id === jenisId)?.name || '',
-      kuantitas: String(kuantitas) 
+      kuantitas: String(kuantitas)
     }]);
   }
   function removeJenis(id) {
@@ -229,8 +229,8 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
     setLoading(true);
     try {
       const headers = await makeHeaders();
-      const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
-      
+      const url = `${API_BASE}/reject/${encodeURIComponent(id)}`;
+
       const res = await fetch(url, { method: 'GET', headers });
       if (!res.ok) throw new Error(`GET failed: ${res.status}`);
       const text = await res.text();
@@ -259,7 +259,7 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
     setLoading(true);
     try {
       const payload = buildPayloadForApi();
-      const url = `${API_BASE}/ops/reject`;
+      const url = `${API_BASE}/reject`;
       const headers = await makeHeaders();
       const res = await fetch(url, {
         method: 'POST',
@@ -294,7 +294,7 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
     setLoading(true);
     try {
       const payload = buildPayloadForApi();
-      const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
+      const url = `${API_BASE}/reject/${encodeURIComponent(id)}`;
       const headers = await makeHeaders();
       const res = await fetch(url, {
         method: 'PUT',
@@ -332,7 +332,7 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
           }
           setLoading(true);
           try {
-            const url = `${API_BASE}/ops/reject/${encodeURIComponent(id)}`;
+            const url = `${API_BASE}/reject/${encodeURIComponent(id)}`;
             const headers = await makeHeaders();
             const res = await fetch(url, { method: 'DELETE', headers });
             const text = await res.text();
@@ -401,226 +401,226 @@ export default function TambahForm({ editingId = null, onSaved = () => {}, onDel
 
 
   return (
-        <View style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: 9}}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 9 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Tambah Button */}
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setShowForm(v => !v)}
         >
-          {/* Tambah Button */}
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => setShowForm(v => !v)}
+          <Text style={styles.addButtonText}>
+            {showForm ? 'Tutup' : '+ Tambah'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Animated Form Section */}
+        {showForm && (
+          <Animated.View
+            style={{
+              opacity: formAnimation,
+              overflow: 'visible',
+              marginHorizontal: 16,
+              marginTop: 10,
+            }}
           >
-            <Text style={styles.addButtonText}>
-              {showForm ? 'Tutup' : '+ Tambah'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Animated Form Section */}
-          {showForm && (
-            <Animated.View
-              style={{
-                opacity: formAnimation,
-                overflow: 'visible',
-                marginHorizontal: 16,
-                marginTop: 10,
-              }}
-            >
-              <View style={styles.formPanel}>
-                {/* Loading overlay */}
-                {loading && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      top: 0,
-                      bottom: 0,
-                      zIndex: 10,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      backgroundColor: 'rgba(255,255,255,0.6)',
-                    }}
-                  >
-                    <ActivityIndicator size="large" color={COLORS.green} />
-                  </View>
-                )}
-
-                {/* Form Content */}
-                <View style={styles.formRow}>
-                  <Text style={styles.formLabel}>Total Reject</Text>
-                  <View style={styles.formInputWrapper}>
-                    <TextInput
-                      style={[styles.formInput, { backgroundColor: COLORS.gray }]}
-                      value={String(totalReject)}
-                      editable={false}
-                      placeholder="0"
-                    />
-                    <Text style={styles.formUnit}>gram</Text>
-                  </View>
-                </View>
-
-                {/* Tanggal */}
-                <View style={styles.formRow}>
-                  <Text style={styles.formLabel}>Tanggal*</Text>
-                  <View style={styles.formInputRow}>
-                    <TouchableOpacity
-                      style={[styles.formInput, { justifyContent: 'center' }]}
-                      onPress={() => setShowDatePicker(true)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={{ color: tanggal ? '#000' : '#888' }}>
-                        {tanggal || 'Pilih tanggal'}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setShowDatePicker(true)}
-                      style={styles.formIconTouchable}
-                    >
-                      <Icon name="calendar" size={22} color={COLORS.green} />
-                    </TouchableOpacity>
-                  </View>
-
-                  {showDatePicker && (
-                    <DateTimePicker
-                      value={dateObj || new Date()}
-                      mode="date"
-                      display="calendar"
-                      onChange={onChangeDate}
-                      maximumDate={new Date(2100, 11, 31)}
-                      minimumDate={new Date(2000, 0, 1)}
-                    />
-                  )}
-                </View>
-
-                {/* Lokasi */}
-                <View style={styles.formRow}>
-                  <Text style={styles.formLabel}>Lokasi*</Text>
-                  <View
-                    style={{
-                      borderWidth: 1,
-                      borderColor: COLORS.green,
-                      borderRadius: 4,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <Picker
-                      selectedValue={lokasiId}
-                      onValueChange={(itemValue) => {
-                        const location = locations.find(loc => loc.id === itemValue);
-                        setLokasiId(itemValue);
-                        setLokasi(location ? location.name : '');
-                      }}
-                      mode="dropdown"
-                      style={{ height: 48 }}
-                    >
-                      <Picker.Item label="Pilih lokasi..." value={null} />
-                      {locations.map(loc => (
-                        <Picker.Item key={loc.id} label={loc.name} value={loc.id} />
-                      ))}
-                    </Picker>
-                  </View>
-                </View>
-
-                <View style={styles.separator} />
-
-                {/* Daftar Reject Section */}
-                <Text style={styles.subFormTitle}>DAFTAR REJECT</Text>
-                <View style={styles.subFormHeader}>
-                  <Text style={[styles.subFormLabel, { marginLeft: 1 }]}>Jenis</Text>
-                  <Text style={styles.subFormLabel}>Kuantitas (gram)</Text>
-                </View>
-
-                {/* Render daftarRejects */}
-                {daftarRejects.map(item => (
-                  <View key={item.id} style={styles.subFormRow}>
-                    <View style={styles.dropdown}>
-                      <View style={{ flex: 1, borderWidth: 1, borderColor: COLORS.darkGray, borderRadius: 4, overflow: 'hidden' }}>
-                        <Picker
-                          selectedValue={item.jenis_id}
-                          onValueChange={(itemValue) => {
-                            const hama = hamaOptions.find(h => h.id === itemValue);
-                            updateJenis(item.id, 'jenis_id', itemValue);
-                            updateJenis(item.id, 'jenis', hama ? hama.name : '');
-                          }}
-                          mode="dropdown"
-                          style={{ height: 40 }}
-                        >
-                          <Picker.Item label="Pilih jenis..." value={null} />
-                          {hamaOptions.map(hama => (
-                            <Picker.Item key={hama.id} label={hama.name} value={hama.id} />
-                          ))}
-                        </Picker>
-                      </View>
-                      <TouchableOpacity onPress={() => removeJenis(item.id)} style={{ marginLeft: 8 }}>
-                        <Icon name="close" size={16} color={COLORS.green} />
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.quantityInputRow}>
-                      <TextInput
-                        placeholder="Kuantitas (gram)"
-                        style={styles.quantityInput}
-                        keyboardType="numeric"
-                        value={String(item.kuantitas)}
-                        onChangeText={(text) => {
-                          const numericValue = text.replace(/[^0-9]/g, '');
-                          updateJenis(item.id, 'kuantitas', numericValue);
-                        }}
-                      />
-                    </View>
-                  </View>
-                ))}
-
-                <TouchableOpacity
-                  style={styles.addJenisButton}
-                  onPress={() => {
-                    if (hamaOptions.length > 0) {
-                      addJenis(hamaOptions[0].id, '');
-                    }
+            <View style={styles.formPanel}>
+              {/* Loading overlay */}
+              {loading && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    zIndex: 10,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: 'rgba(255,255,255,0.6)',
                   }}
                 >
-                  <Text style={styles.addJenisButtonText}>+ Jenis Lain</Text>
-                </TouchableOpacity>
+                  <ActivityIndicator size="large" color={COLORS.green} />
+                </View>
+              )}
 
-                {/* Action Buttons */}
-                <View style={styles.actionButtonsRow}>
-                  <TouchableOpacity
-                    style={styles.saveButton}
-                    onPress={handleSave}
-                    disabled={loading}
-                  >
-                    <Text style={styles.saveButtonText}>
-                      {editingId ? 'Perbarui' : 'Simpan'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {editingId ? (
-                    <TouchableOpacity
-                      style={styles.resetButton}
-                      onPress={() => deleteRecord(editingId)}
-                      disabled={loading}
-                    >
-                      <Text style={styles.resetButtonText}>Hapus</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.resetButton}
-                      onPress={() => resetForm()}
-                      disabled={loading}
-                    >
-                      <Text style={styles.resetButtonText}>Reset</Text>
-                    </TouchableOpacity>
-                  )}
+              {/* Form Content */}
+              <View style={styles.formRow}>
+                <Text style={styles.formLabel}>Total Reject</Text>
+                <View style={styles.formInputWrapper}>
+                  <TextInput
+                    style={[styles.formInput, { backgroundColor: COLORS.gray }]}
+                    value={String(totalReject)}
+                    editable={false}
+                    placeholder="0"
+                  />
+                  <Text style={styles.formUnit}>gram</Text>
                 </View>
               </View>
-            </Animated.View>
-          )}
-        </ScrollView>
-      </View>
-      );
-    }
+
+              {/* Tanggal */}
+              <View style={styles.formRow}>
+                <Text style={styles.formLabel}>Tanggal*</Text>
+                <View style={styles.formInputRow}>
+                  <TouchableOpacity
+                    style={[styles.formInput, { justifyContent: 'center' }]}
+                    onPress={() => setShowDatePicker(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ color: tanggal ? '#000' : '#888' }}>
+                      {tanggal || 'Pilih tanggal'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowDatePicker(true)}
+                    style={styles.formIconTouchable}
+                  >
+                    <Icon name="calendar" size={22} color={COLORS.green} />
+                  </TouchableOpacity>
+                </View>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={dateObj || new Date()}
+                    mode="date"
+                    display="calendar"
+                    onChange={onChangeDate}
+                    maximumDate={new Date(2100, 11, 31)}
+                    minimumDate={new Date(2000, 0, 1)}
+                  />
+                )}
+              </View>
+
+              {/* Lokasi */}
+              <View style={styles.formRow}>
+                <Text style={styles.formLabel}>Lokasi*</Text>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: COLORS.green,
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Picker
+                    selectedValue={lokasiId}
+                    onValueChange={(itemValue) => {
+                      const location = locations.find(loc => loc.id === itemValue);
+                      setLokasiId(itemValue);
+                      setLokasi(location ? location.name : '');
+                    }}
+                    mode="dropdown"
+                    style={{ height: 48 }}
+                  >
+                    <Picker.Item label="Pilih lokasi..." value={null} />
+                    {locations.map(loc => (
+                      <Picker.Item key={loc.id} label={loc.name} value={loc.id} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+
+              <View style={styles.separator} />
+
+              {/* Daftar Reject Section */}
+              <Text style={styles.subFormTitle}>DAFTAR REJECT</Text>
+              <View style={styles.subFormHeader}>
+                <Text style={[styles.subFormLabel, { marginLeft: 1 }]}>Jenis</Text>
+                <Text style={styles.subFormLabel}>Kuantitas (gram)</Text>
+              </View>
+
+              {/* Render daftarRejects */}
+              {daftarRejects.map(item => (
+                <View key={item.id} style={styles.subFormRow}>
+                  <View style={styles.dropdown}>
+                    <View style={{ flex: 1, borderWidth: 1, borderColor: COLORS.darkGray, borderRadius: 4, overflow: 'hidden' }}>
+                      <Picker
+                        selectedValue={item.jenis_id}
+                        onValueChange={(itemValue) => {
+                          const hama = hamaOptions.find(h => h.id === itemValue);
+                          updateJenis(item.id, 'jenis_id', itemValue);
+                          updateJenis(item.id, 'jenis', hama ? hama.name : '');
+                        }}
+                        mode="dropdown"
+                        style={{ height: 40 }}
+                      >
+                        <Picker.Item label="Pilih jenis..." value={null} />
+                        {hamaOptions.map(hama => (
+                          <Picker.Item key={hama.id} label={hama.name} value={hama.id} />
+                        ))}
+                      </Picker>
+                    </View>
+                    <TouchableOpacity onPress={() => removeJenis(item.id)} style={{ marginLeft: 8 }}>
+                      <Icon name="close" size={16} color={COLORS.green} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.quantityInputRow}>
+                    <TextInput
+                      placeholder="Kuantitas (gram)"
+                      style={styles.quantityInput}
+                      keyboardType="numeric"
+                      value={String(item.kuantitas)}
+                      onChangeText={(text) => {
+                        const numericValue = text.replace(/[^0-9]/g, '');
+                        updateJenis(item.id, 'kuantitas', numericValue);
+                      }}
+                    />
+                  </View>
+                </View>
+              ))}
+
+              <TouchableOpacity
+                style={styles.addJenisButton}
+                onPress={() => {
+                  if (hamaOptions.length > 0) {
+                    addJenis(hamaOptions[0].id, '');
+                  }
+                }}
+              >
+                <Text style={styles.addJenisButtonText}>+ Jenis Lain</Text>
+              </TouchableOpacity>
+
+              {/* Action Buttons */}
+              <View style={styles.actionButtonsRow}>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleSave}
+                  disabled={loading}
+                >
+                  <Text style={styles.saveButtonText}>
+                    {editingId ? 'Perbarui' : 'Simpan'}
+                  </Text>
+                </TouchableOpacity>
+
+                {editingId ? (
+                  <TouchableOpacity
+                    style={styles.resetButton}
+                    onPress={() => deleteRecord(editingId)}
+                    disabled={loading}
+                  >
+                    <Text style={styles.resetButtonText}>Hapus</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.resetButton}
+                    onPress={() => resetForm()}
+                    disabled={loading}
+                  >
+                    <Text style={styles.resetButtonText}>Reset</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </Animated.View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   addButton: {

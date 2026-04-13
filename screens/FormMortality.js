@@ -21,7 +21,7 @@ const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
 
 // API endpoints
 const ENDPOINTS = {
-  mortality: '/ops/mortality',
+  mortality: '/mortality',
   variant: '/variant',
 };
 
@@ -50,7 +50,7 @@ export default function FormMortality() {
     lokasi: false,
     varietas: false,
   });
-  
+
   const [varietasOptions, setVarietasOptions] = useState([]);
 
   // Fetch variants from API
@@ -58,23 +58,23 @@ export default function FormMortality() {
     try {
       const headers = await getAuthHeaders();
       const url = `${API_BASE}${ENDPOINTS.variant}?search=&page=1&pageSize=100`;
-      
+
       const response = await fetch(url, { headers });
       if (response.ok) {
         const data = await response.json();
-        
+
         // Extract variants array from response
         const variants = data?.items || data?.data || data || [];
         const variantOptions = variants.map(variant => ({
           id: variant.id,
           name: variant.name || variant.variant_name || variant.title,
         }));
-        
+
         setVarietasOptions(variantOptions);
       } else {
         // Set empty options and show error to user
         setVarietasOptions([]);
-        
+
         Alert.alert(
           'Gagal Memuat Data',
           'Gagal mendapatkan daftar varietas, coba lagi.',
@@ -84,7 +84,7 @@ export default function FormMortality() {
     } catch (error) {
       // Set empty options and show error to user
       setVarietasOptions([]);
-      
+
       Alert.alert(
         'Gagal Memuat Data',
         'Gagal mendapatkan daftar varietas, coba lagi.',
@@ -118,7 +118,7 @@ export default function FormMortality() {
     try {
       const url = `${API_BASE}${ENDPOINTS.mortality}`;
       const headers = await getAuthHeaders();
-      
+
       const res = await fetch(url, {
         method: 'POST',
         headers,
@@ -129,7 +129,7 @@ export default function FormMortality() {
       let json = null;
       try {
         json = JSON.parse(text);
-      } catch {}
+      } catch { }
 
       if (res.ok) {
         return {
@@ -195,7 +195,7 @@ export default function FormMortality() {
       Alert.alert('Form Tidak Lengkap', 'Harap isi semua kolom yang wajib dan pastikan varietas telah dimuat.');
       return;
     }
-    
+
     // Temporary validation for lokasi since it's not implemented yet
     if (!lokasi) {
       Alert.alert(
@@ -205,7 +205,7 @@ export default function FormMortality() {
       );
       return;
     }
-    
+
     // Use the exact format specified by backend
     const mortalityRecord = {
       location_id: lokasiId,
@@ -220,17 +220,19 @@ export default function FormMortality() {
         reason: "Plant mortality"
       }
     };
-    
+
     const res = await postToApi(mortalityRecord);
 
     if (res && res.ok) {
-      Alert.alert('Berhasil', 
-        'Data berhasil dikirim!', 
+      Alert.alert('Berhasil',
+        'Data berhasil dikirim!',
         [
-          { text: 'OK', onPress: () => {
+          {
+            text: 'OK', onPress: () => {
               resetForm();
               navigation.navigate('Mortality');
-          }}
+            }
+          }
         ]
       );
     } else {
@@ -244,8 +246,8 @@ export default function FormMortality() {
       headerLogoSvg={backArrowSvg}
       onHeaderLeftPress={() => navigation.goBack()}
     >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer} 
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={closeAllDropdowns}
       >
@@ -256,13 +258,13 @@ export default function FormMortality() {
             <SvgXml xml={calendarSvg} width={20} height={20} />
           </TouchableOpacity>
           {showTanggal && (
-            <DateTimePicker 
-              value={tanggal} 
-              mode="date" 
+            <DateTimePicker
+              value={tanggal}
+              mode="date"
               display="default"
-              onChange={(e, date) => { 
-                setShowTanggal(false); 
-                if (date) setTanggal(date); 
+              onChange={(e, date) => {
+                setShowTanggal(false);
+                if (date) setTanggal(date);
               }}
             />
           )}
@@ -270,50 +272,50 @@ export default function FormMortality() {
 
         <View style={styles.fieldSpacing}>
           <Text style={styles.label}>Lokasi<Text style={styles.required}>*</Text></Text>
-          <DropdownInput 
-            value={lokasi} 
+          <DropdownInput
+            value={lokasi}
             onPress={() => {
               Alert.alert(
                 'Fitur Belum Tersedia',
                 'Pilihan lokasi akan ditambahkan pada versi selanjutnya.',
                 [{ text: 'Mengerti', style: 'default' }]
               );
-            }} 
+            }}
             placeholder="Pilih Lokasi"
           />
         </View>
 
         <View style={styles.fieldSpacing}>
           <Text style={styles.label}>Varietas<Text style={styles.required}>*</Text></Text>
-          <DropdownInput 
-            value={varietas} 
-            onPress={() => setDropdownOpen(prev => ({ ...prev, varietas: !prev.varietas }))} 
+          <DropdownInput
+            value={varietas}
+            onPress={() => setDropdownOpen(prev => ({ ...prev, varietas: !prev.varietas }))}
             placeholder="Pilih Varietas"
           />
           {dropdownOpen.varietas && (
-            <DropdownBox 
-              items={varietasOptions.map(variant => variant.name)} 
-              onSelect={(opt) => { 
+            <DropdownBox
+              items={varietasOptions.map(variant => variant.name)}
+              onSelect={(opt) => {
                 // Find the selected variant object to get the ID
                 const selectedVariant = varietasOptions.find(variant => variant.name === opt);
-                setVarietas(opt); 
+                setVarietas(opt);
                 setVarietasId(selectedVariant?.id || null);
-                closeAllDropdowns(); 
-              }} 
+                closeAllDropdowns();
+              }}
             />
           )}
         </View>
-        
+
         <Text style={styles.sectionTitle}>Input Mortalitas</Text>
 
         <View style={styles.mortalityContainer}>
           <View style={styles.mortalityRow}>
             <Text style={styles.mortalityLabel}>Total Tanaman Saat Ini</Text>
             <View style={styles.inputWithUnit}>
-              <TextInput 
-                style={styles.mortalityInput} 
-                value={totalTanamanSaatIni} 
-                onChangeText={setTotalTanamanSaatIni} 
+              <TextInput
+                style={styles.mortalityInput}
+                value={totalTanamanSaatIni}
+                onChangeText={setTotalTanamanSaatIni}
                 keyboardType="number-pad"
                 placeholder="8000"
               />
@@ -324,20 +326,20 @@ export default function FormMortality() {
           <View style={styles.mortalityRowHalf}>
             <View style={styles.halfInput}>
               <Text style={styles.mortalityLabel}>Tanaman Mati</Text>
-              <TextInput 
-                style={styles.mortalityInputSmall} 
-                value={tanamanMati} 
-                onChangeText={setTanamanMati} 
+              <TextInput
+                style={styles.mortalityInputSmall}
+                value={tanamanMati}
+                onChangeText={setTanamanMati}
                 keyboardType="number-pad"
                 placeholder="80"
               />
             </View>
             <View style={styles.halfInput}>
               <Text style={styles.mortalityLabel}>Tanaman Sulam</Text>
-              <TextInput 
-                style={styles.mortalityInputSmall} 
-                value={tanamanSulam} 
-                onChangeText={setTanamanSulam} 
+              <TextInput
+                style={styles.mortalityInputSmall}
+                value={tanamanSulam}
+                onChangeText={setTanamanSulam}
                 keyboardType="number-pad"
                 placeholder="0"
               />
@@ -347,9 +349,9 @@ export default function FormMortality() {
           <View style={styles.mortalityRow}>
             <Text style={styles.mortalityLabel}>Total Tanaman Setelahnya</Text>
             <View style={styles.inputWithUnit}>
-              <TextInput 
-                style={[styles.mortalityInput, styles.readOnly]} 
-                value={totalTanamanSetelahnya} 
+              <TextInput
+                style={[styles.mortalityInput, styles.readOnly]}
+                value={totalTanamanSetelahnya}
                 editable={false}
               />
               <Text style={styles.unitLabel}>tanaman</Text>
@@ -378,14 +380,14 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: '600', color: '#000', marginBottom: 6 },
   required: { color: '#8B2D2D' },
   inputBox: {
-    borderWidth: 1, 
-    borderColor: '#ddd', 
-    borderRadius: 8, 
-    height: 48, 
-    paddingHorizontal: 12, 
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    height: 48,
+    paddingHorizontal: 12,
     backgroundColor: '#fff',
-    flexDirection: 'row', 
-    alignItems: 'center', 
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between'
   },
   inputText: {
@@ -393,7 +395,7 @@ const styles = StyleSheet.create({
     color: '#333',
     flex: 1,
   },
-  
+
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -414,7 +416,7 @@ const styles = StyleSheet.create({
   mortalityRow: {
     marginBottom: 16,
   },
-  
+
   mortalityRowHalf: {
     flexDirection: 'row',
     gap: 12,
@@ -467,15 +469,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  readOnly: { 
+  readOnly: {
     backgroundColor: '#f5f5f5',
     color: '#666',
   },
 
-  buttonRow: { 
-    flexDirection: 'row', 
-    gap: 12, 
-    marginTop: 24 
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24
   },
 
   button: {
@@ -485,11 +487,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 
-  simpanButton: { 
+  simpanButton: {
     backgroundColor: '#1D4949'
   },
 
-  resetButton: { 
+  resetButton: {
     backgroundColor: '#8B2D2D'
   },
 

@@ -30,13 +30,12 @@ import RoundedButton from '../components/RoundedButton';
 
 /** ---------- Config from environment ---------- */
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
-const API_BASE_2_ = process.env.LOCATION_API_BASE;
 const PAGE_SIZE = 10;
 const MAX_PAGES = 200;
 
 const CANDIDATE_ENDPOINTS = {
-  lokasi: ['/location/dropdown'],
-  hama: ['/hama', '/pest'],
+  lokasi: ['/location/list'],
+  hama: ['/hama'],
   pestisida: ['/pesticide'],
 };
 
@@ -47,7 +46,9 @@ const buildUrl = (path, page = 1, pageSize = PAGE_SIZE) => {
   const p = new URLSearchParams();
   if (pageSize) p.set('pageSize', String(pageSize));
   if (page) p.set('page', String(page));
-  const base = path === '/location' ? API_BASE_2_ : API_BASE;
+  if (path === '/location/list') p.set('org_code', 'org_b56b8313086');
+  if (path === '/pesticide') p.set('org_code', 'org_b56b8313086');
+  const base = path === '/location' ? API_BASE : API_BASE;
   return `${base}${path}?${p.toString()}`;
 };
 
@@ -75,7 +76,7 @@ export default function FormPesticideUsage() {
 
   const getAuthHeaders = React.useCallback(async () => {
     if (!isAuthenticated) {
-      await login().catch(() => {});
+      await login().catch(() => { });
     }
     const token = await getAccessToken(process.env.EXPO_PUBLIC_KINDE_AUDIENCE);
     return {
@@ -182,7 +183,7 @@ export default function FormPesticideUsage() {
     try {
       const all = await fetchAllPages(CANDIDATE_ENDPOINTS.lokasi[0]);
       setLokasiObjects(all);
-      const labels = Array.from(new Set(all.map(toLabel).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+      const labels = Array.from(new Set(all.map(toLabel).filter(Boolean))).sort((a, b) => a.localeCompare(b));
       setLokasiOptions(labels);
     } catch (e) {
       setError((prev) => (prev ? prev + ' | ' : '') + `Lokasi: ${e?.message || e}`);
@@ -198,7 +199,7 @@ export default function FormPesticideUsage() {
         try {
           const all = await fetchAllPages(path);
           setHamaObjects(all);
-          const labels = Array.from(new Set(all.map(toLabel).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+          const labels = Array.from(new Set(all.map(toLabel).filter(Boolean))).sort((a, b) => a.localeCompare(b));
           setHamaOptions(labels);
           return;
         } catch (e) {
@@ -225,14 +226,14 @@ export default function FormPesticideUsage() {
             type: x?.type ?? '',
             active_ingredient: x?.active_ingredient ?? x?.activeIngredient ?? '',
           }));
-          setPestisidaObjects([...objs].sort((a,b)=>a.name.localeCompare(b.name)));
-          
+          setPestisidaObjects([...objs].sort((a, b) => a.name.localeCompare(b.name)));
+
           // Create combined labels in format "name - active_ingredient"
           const combinedLabels = objs.map(o => {
             const activeIngredient = o.active_ingredient || 'Unknown ingredient';
             return `${o.name} - ${activeIngredient}`;
-          }).sort((a,b)=>a.localeCompare(b));
-          
+          }).sort((a, b) => a.localeCompare(b));
+
           setPestisidaLabels(combinedLabels);
           return;
         } catch (e) {
@@ -258,7 +259,7 @@ export default function FormPesticideUsage() {
     const m = {};
     for (const x of lokasiObjects) {
       const label = toLabel(x);
-      const id = idFrom(x, ['id','location_id','lokasi_id','id_lokasi']);
+      const id = idFrom(x, ['id', 'location_id', 'lokasi_id', 'id_lokasi']);
       if (label && id != null) m[label] = id;
     }
     return m;
@@ -268,7 +269,7 @@ export default function FormPesticideUsage() {
     const m = {};
     for (const x of hamaObjects) {
       const label = toLabel(x);
-      const id = idFrom(x, ['id','pest_id','hama_id']);
+      const id = idFrom(x, ['id', 'pest_id', 'hama_id']);
       if (label && id != null) m[label] = id;
     }
     return m;
@@ -287,7 +288,7 @@ export default function FormPesticideUsage() {
   }, [pestisidaObjects]);
 
   // ---------- formatters
-  const pad2 = (n) => String(n).padStart(2,'0');
+  const pad2 = (n) => String(n).padStart(2, '0');
   const toDateYYYYMMDD = (d) => {
     return d ? d.toISOString().split('T')[0] : '';  // Ensures "YYYY-MM-DD" format
   };
@@ -342,218 +343,218 @@ export default function FormPesticideUsage() {
   };
 
   // ----- ALWAYS multipart/form-data -----
-const postToApi = async (payload) => {
-  const url = `${API_BASE}/hpt/ipm`;
-  
-  console.log('[FormPesticideUsage] ===== POST API START =====');
-  console.log('[FormPesticideUsage] POST URL:', url);
-  console.log('[FormPesticideUsage] Payload to send:');
-  console.log(JSON.stringify(payload, null, 2));
-  
-  const headers = await getAuthHeaders();
-  headers['Content-Type'] = 'application/json';
-  
-  console.log('[FormPesticideUsage] Auth headers:', {
-    ...headers,
-    Authorization: headers.Authorization ? 'Bearer [TOKEN_PRESENT]' : 'None'
-  });
+  const postToApi = async (payload) => {
+    const url = `${API_BASE}/hpt/ipm`;
 
-  const requestOptions = {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
+    console.log('[FormPesticideUsage] ===== POST API START =====');
+    console.log('[FormPesticideUsage] POST URL:', url);
+    console.log('[FormPesticideUsage] Payload to send:');
+    console.log(JSON.stringify(payload, null, 2));
+
+    const headers = await getAuthHeaders();
+    headers['Content-Type'] = 'application/json';
+
+    console.log('[FormPesticideUsage] Auth headers:', {
+      ...headers,
+      Authorization: headers.Authorization ? 'Bearer [TOKEN_PRESENT]' : 'None'
+    });
+
+    const requestOptions = {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    };
+
+    console.log('[FormPesticideUsage] Request options:', {
+      method: requestOptions.method,
+      headers: requestOptions.headers,
+      bodyLength: requestOptions.body.length
+    });
+
+    const res = await fetch(url, requestOptions);
+
+    console.log('[FormPesticideUsage] POST response status:', res.status, res.statusText);
+    console.log('[FormPesticideUsage] POST response headers:', Object.fromEntries(res.headers.entries()));
+
+    const text = await res.text();
+    console.log('[FormPesticideUsage] Raw response text:', text);
+
+    let json = null;
+    try {
+      json = JSON.parse(text);
+      console.log('[FormPesticideUsage] Parsed JSON response:');
+      console.log(JSON.stringify(json, null, 2));
+    } catch (parseError) {
+      console.warn('[FormPesticideUsage] Failed to parse JSON response:', parseError.message);
+    }
+
+    const result = {
+      ok: res.ok,
+      status: res.status,
+      msg: json?.message || json?.error || text,
+      data: json ?? text,
+    };
+
+    console.log('[FormPesticideUsage] ===== POST API RESULT =====');
+    console.log('[FormPesticideUsage] Success:', result.ok);
+    console.log('[FormPesticideUsage] Status:', result.status);
+    console.log('[FormPesticideUsage] Message:', result.msg);
+
+    return result;
   };
-  
-  console.log('[FormPesticideUsage] Request options:', {
-    method: requestOptions.method,
-    headers: requestOptions.headers,
-    bodyLength: requestOptions.body.length
-  });
 
-  const res = await fetch(url, requestOptions);
-  
-  console.log('[FormPesticideUsage] POST response status:', res.status, res.statusText);
-  console.log('[FormPesticideUsage] POST response headers:', Object.fromEntries(res.headers.entries()));
 
-  const text = await res.text();
-  console.log('[FormPesticideUsage] Raw response text:', text);
-  
-  let json = null;
-  try {
-    json = JSON.parse(text);
-    console.log('[FormPesticideUsage] Parsed JSON response:');
-    console.log(JSON.stringify(json, null, 2));
-  } catch (parseError) {
-    console.warn('[FormPesticideUsage] Failed to parse JSON response:', parseError.message);
-  }
+  const uploadToCloudinary = async (uri) => {
+    console.log('[FormPesticideUsage] ===== IMAGE UPLOAD START =====');
+    console.log('[FormPesticideUsage] Original image URI:', uri);
 
-  const result = {
-    ok: res.ok,
-    status: res.status,
-    msg: json?.message || json?.error || text,
-    data: json ?? text,
+    const compressed = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1280 } }],
+      { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+    );
+
+    console.log('[FormPesticideUsage] Compressed image URI:', compressed.uri);
+
+    const fileName = compressed.uri.split('/').pop();
+    console.log('[FormPesticideUsage] Generated filename:', fileName);
+
+    const formData = new FormData();
+    formData.append('file', {
+      uri: compressed.uri,
+      name: fileName,
+      type: 'image/jpeg',
+    });
+    formData.append('upload_preset', 'ml_default');
+    formData.append('cloud_name', 'dsja6uts0');
+
+    console.log('[FormPesticideUsage] FormData prepared for Cloudinary upload');
+    console.log('[FormPesticideUsage] Upload preset: ml_default');
+    console.log('[FormPesticideUsage] Cloud name: dsja6uts0');
+
+    const cloudinaryUrl = 'https://api.cloudinary.com/v1_1/dsja6uts0/image/upload';
+    console.log('[FormPesticideUsage] Cloudinary URL:', cloudinaryUrl);
+
+    const res = await fetch(cloudinaryUrl, {
+      method: 'POST',
+      body: formData,
+    });
+
+    console.log('[FormPesticideUsage] Cloudinary response status:', res.status, res.statusText);
+
+    const data = await res.json();
+    console.log('[FormPesticideUsage] Cloudinary response data:');
+    console.log(JSON.stringify(data, null, 2));
+
+    if (data.secure_url) {
+      console.log('[FormPesticideUsage] ===== IMAGE UPLOAD SUCCESS =====');
+      console.log('[FormPesticideUsage] Uploaded image URL:', data.secure_url);
+      return data.secure_url;
+    } else {
+      console.error('[FormPesticideUsage] ===== IMAGE UPLOAD FAILED =====');
+      console.error('[FormPesticideUsage] Error data:', JSON.stringify(data, null, 2));
+      throw new Error('Upload failed: ' + JSON.stringify(data));
+    }
   };
-  
-  console.log('[FormPesticideUsage] ===== POST API RESULT =====');
-  console.log('[FormPesticideUsage] Success:', result.ok);
-  console.log('[FormPesticideUsage] Status:', result.status);
-  console.log('[FormPesticideUsage] Message:', result.msg);
-  
-  return result;
-};
 
+  const handleAdd = async () => {
+    console.log('[FormPesticideUsage] ===== FORM SUBMISSION START =====');
+    console.log('[FormPesticideUsage] Form validation check...');
 
-const uploadToCloudinary = async (uri) => {
-console.log('[FormPesticideUsage] ===== IMAGE UPLOAD START =====');
-console.log('[FormPesticideUsage] Original image URI:', uri);
+    const requiredFields = {
+      tanggal, lokasi, hama, pestisida, penggunaan1, dosisValue, suhu, startTime, endTime, tenagaKerja
+    };
+    console.log('[FormPesticideUsage] Required fields status:', {
+      tanggal: !!tanggal,
+      lokasi: !!lokasi,
+      hama: !!hama,
+      pestisida: !!pestisida,
+      penggunaan1: !!penggunaan1,
+      dosisValue: !!dosisValue,
+      suhu: !!suhu,
+      startTime: !!startTime,
+      endTime: !!endTime,
+      tenagaKerja: !!tenagaKerja
+    });
 
-const compressed = await ImageManipulator.manipulateAsync(
-uri,
-[{ resize: { width: 1280 } }],
-{ compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
-);
+    if (!tanggal || !lokasi || !hama || !pestisida || !penggunaan1 || !dosisValue || !suhu || !startTime || !endTime || !tenagaKerja) {
+      Alert.alert('Form Incomplete', 'Please fill in all required fields (*) before submitting.');
+      console.log('[FormPesticideUsage] Form validation failed - missing required fields');
+      return;
+    }
 
-console.log('[FormPesticideUsage] Compressed image URI:', compressed.uri);
+    console.log('[FormPesticideUsage] Form validation passed');
 
-const fileName = compressed.uri.split('/').pop();
-console.log('[FormPesticideUsage] Generated filename:', fileName);
+    // Extract pesticide name from combined label for API payload
+    const pestisidaName = pestisida ? pestisida.split(' - ')[0] : '';
+    console.log('[FormPesticideUsage] Extracted pesticide name:', pestisidaName);
 
-const formData = new FormData();
-formData.append('file', {
-uri: compressed.uri,
-name: fileName,
-type: 'image/jpeg',
-});
-formData.append('upload_preset', 'ml_default');
-formData.append('cloud_name', 'dsja6uts0');
+    console.log('[FormPesticideUsage] Building payload...');
+    const payload = {
+      datetime: toDateYYYYMMDD(tanggal),
+      start: toHHMM(startTime),
+      end: toHHMM(endTime),
+      duration: Math.floor((endTime - startTime) / 60000),
+      treatment: penggunaan1,
+      dosage: parseFloat(dosisValue),
+      unit: dosisUnit,
+      usage: parseFloat(penggunaan2),
+      temperature: parseFloat(suhu),
+      manpower: parseInt(tenagaKerja, 10),
+      ...(lokasiIdByLabel[lokasi] ? { location_id: lokasiIdByLabel[lokasi] } : { location_name: lokasi }),
+      ...(hamaIdByLabel[hama] ? { pest_id: hamaIdByLabel[hama] } : { pest_name: hama }),
+      ...(pestisidaIdByLabel[pestisida] ? { pesticide_id: pestisidaIdByLabel[pestisida] } : { pesticide_name: pestisidaName }),
+      pic: pic || 'System', // Default value since field is removed
+      description,
+    };
 
-console.log('[FormPesticideUsage] FormData prepared for Cloudinary upload');
-console.log('[FormPesticideUsage] Upload preset: ml_default');
-console.log('[FormPesticideUsage] Cloud name: dsja6uts0');
+    if (photo) {
+      console.log('[FormPesticideUsage] Photo detected, uploading to Cloudinary...');
+      try {
+        const imageUrl = await uploadToCloudinary(photo);
+        payload.picture = imageUrl;
+        console.log('[FormPesticideUsage] Photo upload successful, added to payload');
+      } catch (e) {
+        console.error('[FormPesticideUsage] Photo upload failed:', e.message);
+        Alert.alert('Upload Failed', 'Gagal mengunggah gambar ke Cloudinary.');
+        return;
+      }
+    } else {
+      console.log('[FormPesticideUsage] No photo to upload');
+    }
 
-const cloudinaryUrl = 'https://api.cloudinary.com/v1_1/dsja6uts0/image/upload';
-console.log('[FormPesticideUsage] Cloudinary URL:', cloudinaryUrl);
+    console.log('[FormPesticideUsage] Final payload ready for API:');
+    console.log(JSON.stringify(payload, null, 2));
 
-const res = await fetch(cloudinaryUrl, {
-method: 'POST',
-body: formData,
-});
+    const res = await postToApi(payload);
 
-console.log('[FormPesticideUsage] Cloudinary response status:', res.status, res.statusText);
-
-const data = await res.json();
-console.log('[FormPesticideUsage] Cloudinary response data:');
-console.log(JSON.stringify(data, null, 2));
-
-if (data.secure_url) {
-  console.log('[FormPesticideUsage] ===== IMAGE UPLOAD SUCCESS =====');
-  console.log('[FormPesticideUsage] Uploaded image URL:', data.secure_url);
-  return data.secure_url;
-} else {
-  console.error('[FormPesticideUsage] ===== IMAGE UPLOAD FAILED =====');
-  console.error('[FormPesticideUsage] Error data:', JSON.stringify(data, null, 2));
-  throw new Error('Upload failed: ' + JSON.stringify(data));
-}
-};
-
-const handleAdd = async () => {
-console.log('[FormPesticideUsage] ===== FORM SUBMISSION START =====');
-console.log('[FormPesticideUsage] Form validation check...');
-
-const requiredFields = {
-  tanggal, lokasi, hama, pestisida, penggunaan1, dosisValue, suhu, startTime, endTime, tenagaKerja
-};
-console.log('[FormPesticideUsage] Required fields status:', {
-  tanggal: !!tanggal,
-  lokasi: !!lokasi,
-  hama: !!hama,
-  pestisida: !!pestisida,
-  penggunaan1: !!penggunaan1,
-  dosisValue: !!dosisValue,
-  suhu: !!suhu,
-  startTime: !!startTime,
-  endTime: !!endTime,
-  tenagaKerja: !!tenagaKerja
-});
-
-if (!tanggal || !lokasi || !hama || !pestisida || !penggunaan1 || !dosisValue || !suhu || !startTime || !endTime || !tenagaKerja) {
-Alert.alert('Form Incomplete', 'Please fill in all required fields (*) before submitting.');
-console.log('[FormPesticideUsage] Form validation failed - missing required fields');
-return;
-}
-
-console.log('[FormPesticideUsage] Form validation passed');
-
-// Extract pesticide name from combined label for API payload
-const pestisidaName = pestisida ? pestisida.split(' - ')[0] : '';
-console.log('[FormPesticideUsage] Extracted pesticide name:', pestisidaName);
-
-console.log('[FormPesticideUsage] Building payload...');
-const payload = {
-datetime: toDateYYYYMMDD(tanggal),
-start: toHHMM(startTime),
-end: toHHMM(endTime),
-duration: Math.floor((endTime - startTime) / 60000),
-treatment: penggunaan1,
-dosage: parseFloat(dosisValue),
-unit: dosisUnit,
-usage: parseFloat(penggunaan2),
-temperature: parseFloat(suhu),
-manpower: parseInt(tenagaKerja, 10),
-...(lokasiIdByLabel[lokasi] ? { location_id: lokasiIdByLabel[lokasi] } : { location_name: lokasi }),
-...(hamaIdByLabel[hama] ? { pest_id: hamaIdByLabel[hama] } : { pest_name: hama }),
-...(pestisidaIdByLabel[pestisida] ? { pesticide_id: pestisidaIdByLabel[pestisida] } : { pesticide_name: pestisidaName }),
-pic: pic || 'System', // Default value since field is removed
-description,
-};
-
-if (photo) {
-console.log('[FormPesticideUsage] Photo detected, uploading to Cloudinary...');
-try {
-const imageUrl = await uploadToCloudinary(photo);
-payload.picture = imageUrl;
-console.log('[FormPesticideUsage] Photo upload successful, added to payload');
-} catch (e) {
-console.error('[FormPesticideUsage] Photo upload failed:', e.message);
-Alert.alert('Upload Failed', 'Gagal mengunggah gambar ke Cloudinary.');
-return;
-}
-} else {
-console.log('[FormPesticideUsage] No photo to upload');
-}
-
-console.log('[FormPesticideUsage] Final payload ready for API:');
-console.log(JSON.stringify(payload, null, 2));
-
-const res = await postToApi(payload);
-
-console.log('[FormPesticideUsage] ===== FORM SUBMISSION RESULT =====');
-if (res.ok) {
-console.log('[FormPesticideUsage] Form submission SUCCESS!');
-console.log('[FormPesticideUsage] Response data:', res.data);
-Alert.alert(
-'Success',
-'Data berhasil disimpan.',
-[
-{
-text: 'OK',
-onPress: () => {
-console.log('[FormPesticideUsage] Resetting form and navigating to PesticideUsage');
-resetForm();
-navigation.navigate('PesticideUsage');
-}
-}
-],
-{ cancelable: false }
-);
-} else {
-console.error('[FormPesticideUsage] Form submission FAILED!');
-console.error('[FormPesticideUsage] Error status:', res.status);
-console.error('[FormPesticideUsage] Error message:', res.msg);
-console.error('[FormPesticideUsage] Full error response:', res);
-Alert.alert('Gagal menyimpan', res.msg);
-}
-};
+    console.log('[FormPesticideUsage] ===== FORM SUBMISSION RESULT =====');
+    if (res.ok) {
+      console.log('[FormPesticideUsage] Form submission SUCCESS!');
+      console.log('[FormPesticideUsage] Response data:', res.data);
+      Alert.alert(
+        'Success',
+        'Data berhasil disimpan.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              console.log('[FormPesticideUsage] Resetting form and navigating to PesticideUsage');
+              resetForm();
+              navigation.navigate('PesticideUsage');
+            }
+          }
+        ],
+        { cancelable: false }
+      );
+    } else {
+      console.error('[FormPesticideUsage] Form submission FAILED!');
+      console.error('[FormPesticideUsage] Error status:', res.status);
+      console.error('[FormPesticideUsage] Error message:', res.msg);
+      console.error('[FormPesticideUsage] Full error response:', res);
+      Alert.alert('Gagal menyimpan', res.msg);
+    }
+  };
 
 
   const onSelectPestisida = (combinedLabel) => {

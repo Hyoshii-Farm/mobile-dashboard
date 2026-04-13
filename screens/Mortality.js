@@ -19,8 +19,8 @@ const MAX_PAGES = 200;
 
 // API endpoints
 const ENDPOINTS = {
-  mortality: '/ops/mortality',
-  lokasi: '/location/dropdown',
+  mortality: '/mortality',
+  lokasi: '/location/list',
   variant: '/variant',
 };
 
@@ -46,7 +46,7 @@ export default function MortalityPage() {
   // Form visibility state
   const [showForm, setShowForm] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
-  
+
   // Form fields
   const [formData, setFormData] = useState({
     tanggal: new Date(),
@@ -78,20 +78,20 @@ export default function MortalityPage() {
     const params = new URLSearchParams();
     if (pageSize) params.set('pageSize', String(pageSize));
     if (page) params.set('page', String(page));
-    
+
     // Add sorting to get most recent data first
     if (path.includes('mortality')) {
       params.set('sort', 'createdAt');
       params.set('order', 'desc');
     }
-    
+
     return `${API_BASE}${path}?${params.toString()}`;
   };
 
   const getAuthHeaders = useCallback(async () => {
     const audience = process.env.EXPO_PUBLIC_KINDE_AUDIENCE;
     const token = await getAccessToken(audience);
-    
+
     return {
       Accept: 'application/json',
       'Content-Type': 'application/json',
@@ -107,9 +107,9 @@ export default function MortalityPage() {
 
     while (page <= MAX_PAGES) {
       const url = buildUrl(path, page, pageSize);
-      
+
       const res = await fetch(url, { headers });
-      
+
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
         throw new Error(`${res.status} ${res.statusText} ${txt}`.trim());
@@ -160,39 +160,39 @@ export default function MortalityPage() {
     try {
       setLoading((s) => ({ ...s, lokasi: true }));
       setServerStatus('connecting');
-      
+
       const headers = await getAuthHeaders();
       // Use the same endpoint format as LaporanProduksi to get all locations
-      const url = `${API_BASE}/location/dropdown?search&concise=true&nursery=false&pageSize=100`;
-      
+      const url = `${API_BASE}/location/list?search&concise=true&nursery=false&pageSize=100&org_code=org_b56b8313086`;
+
       const response = await fetch(url, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const result = await response.json();
-      
+
       // Store full location objects - handle different response structures
       const locations = result.data || result || [];
       setLokasiObjects(locations);
-      
+
       // Extract location names using the helper function
       const locationNames = locations
         .map(getLocationName)
         .filter(name => name && name.trim().length > 0);
-      
+
       const uniqueLocations = Array.from(new Set(locationNames)).sort();
       setLokasiOptions(uniqueLocations);
       setServerStatus('online');
-      
+
     } catch (error) {
       setServerStatus('offline');
-      
+
       // Set empty options and show error to user
       setLokasiOptions([]);
       setLokasiObjects([]);
-      
+
       // Show error notification to user
       Alert.alert(
         'Gagal Memuat Data',
@@ -207,25 +207,25 @@ export default function MortalityPage() {
   const fetchVariantOptions = useCallback(async () => {
     try {
       setLoading((s) => ({ ...s, variant: true }));
-      
+
       const variants = await fetchAllPages(ENDPOINTS.variant, PAGE_SIZE);
-      
+
       // Store full variant objects for ID mapping
       setVarietasObjects(variants);
-      
+
       // Extract variant names from response
-      const variantNames = variants.map(variant => 
+      const variantNames = variants.map(variant =>
         variant.name || variant.variant_name || variant.title || variant.nama || String(variant)
       ).filter(name => name && name.trim().length > 0);
-      
+
       const uniqueVariants = Array.from(new Set(variantNames)).sort();
       setVarietasOptions(uniqueVariants);
-      
+
     } catch (error) {
       // Set empty options and show error to user
       setVarietasOptions([]);
       setVarietasObjects([]);
-      
+
       // Show error notification to user
       Alert.alert(
         'Gagal Memuat Data',
@@ -247,9 +247,9 @@ export default function MortalityPage() {
       setLoading((s) => ({ ...s, mortality: true }));
       setError(null);
       setServerStatus('connecting');
-      
+
       const mortalityRecords = await fetchAllPages(ENDPOINTS.mortality, PAGE_SIZE);
-      
+
       // Transform API data to match UI expectations
       const transformedData = mortalityRecords.map(item => ({
         location_name: item.location_name,
@@ -266,15 +266,15 @@ export default function MortalityPage() {
           return {
             id: id, // Preserve actual API ID
             date: detail.planting_date || detail.date,
-            status: detail.action === 'REMOVE' ? 'Mati' : 
-                    detail.action === 'ADD' ? 'Sulam' : 
-                    detail.action === 'INITIAL' ? 'Awal' : 
-                    detail.status || detail.action,
+            status: detail.action === 'REMOVE' ? 'Mati' :
+              detail.action === 'ADD' ? 'Sulam' :
+                detail.action === 'INITIAL' ? 'Awal' :
+                  detail.status || detail.action,
             quantity: detail.quantity
           };
         })
       }));
-      
+
       setServerStatus('online');
       setMortalityData(transformedData);
       return;
@@ -282,7 +282,7 @@ export default function MortalityPage() {
       setServerStatus('offline');
       setError('Gagal mendapatkan data mortalitas, coba lagi.');
       setMortalityData([]);
-      
+
       Alert.alert(
         'Gagal Memuat Data',
         'Gagal mendapatkan data mortalitas, coba lagi.',
@@ -364,7 +364,7 @@ export default function MortalityPage() {
     try {
       // Try to parse the date string (e.g., "12 May 2025" or "20 October 2025")
       const dateStr = detail.date;
-      
+
       if (dateStr) {
         // Convert "12 May 2025" or "20 October 2025" to a proper date
         const parts = dateStr.split(' ');
@@ -372,12 +372,12 @@ export default function MortalityPage() {
           const day = parseInt(parts[0]);
           const monthName = parts[1];
           const year = parseInt(parts[2]);
-          
+
           const months = {
             'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
             'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11
           };
-          
+
           if (months[monthName] !== undefined) {
             parsedDate = new Date(year, months[monthName], day);
           }
@@ -413,7 +413,7 @@ export default function MortalityPage() {
   const handleDeleteRecord = async (locationName, detail) => {
     // Check if we have a valid API ID
     const recordId = detail.id || detail._id || detail.mortality_id;
-    
+
     if (!recordId) {
       Alert.alert(
         'Kesalahan',
@@ -437,14 +437,14 @@ export default function MortalityPage() {
           onPress: async () => {
             try {
               const result = await deleteFromApi(recordId);
-              
+
               if (result.ok) {
                 Alert.alert(
                   'Berhasil',
                   'Data berhasil dihapus.',
                   [
-                    { 
-                      text: 'Selesai', 
+                    {
+                      text: 'Selesai',
                       style: 'default',
                       onPress: () => {
                         // Auto-refresh data after successful deletion
@@ -455,14 +455,14 @@ export default function MortalityPage() {
                 );
               } else {
                 const errorMsg = result.msg || 'Gagal menghapus data. Silakan coba lagi.';
-                  
+
                 Alert.alert('Gagal Menghapus', errorMsg, [
                   { text: 'Mengerti', style: 'default' }
                 ]);
               }
             } catch (error) {
               Alert.alert(
-                'Kesalahan', 
+                'Kesalahan',
                 'Terjadi kesalahan saat menghapus data. Silakan coba lagi.',
                 [{ text: 'Mengerti', style: 'default' }]
               );
@@ -479,7 +479,7 @@ export default function MortalityPage() {
     const mati = parseInt(formData.tanamanMati, 10) || 0;
     const sulam = parseInt(formData.tanamanSulam, 10) || 0;
     const setelahnya = saatIni - mati + sulam;
-    
+
     setFormData(prev => ({
       ...prev,
       totalTanamanSetelahnya: setelahnya.toString()
@@ -490,7 +490,7 @@ export default function MortalityPage() {
     try {
       const url = `${API_BASE}${ENDPOINTS.mortality}`;
       const headers = await getAuthHeaders();
-      
+
       const res = await fetch(url, {
         method: 'POST',
         headers,
@@ -501,7 +501,7 @@ export default function MortalityPage() {
       let json = null;
       try {
         json = JSON.parse(text);
-      } catch {}
+      } catch { }
 
       if (res.ok) {
         return {
@@ -534,7 +534,7 @@ export default function MortalityPage() {
       // Use PUT as specified by backend
       const url = `${API_BASE}${ENDPOINTS.mortality}/${recordId}`;
       const headers = await getAuthHeaders();
-      
+
       const res = await fetch(url, {
         method: 'PUT',
         headers,
@@ -545,7 +545,7 @@ export default function MortalityPage() {
       let json = null;
       try {
         json = JSON.parse(text);
-      } catch {}
+      } catch { }
 
       // Consider success if status is 2xx
       if (res.ok || (res.status >= 200 && res.status < 300)) {
@@ -554,8 +554,8 @@ export default function MortalityPage() {
           status: res.status,
           msg: json?.message || 'Data berhasil diperbarui',
         };
-      } 
-      
+      }
+
       // For 500 errors, we'll assume success since data updates immediately
       if (res.status === 500) {
         return {
@@ -565,11 +565,11 @@ export default function MortalityPage() {
           needsRefresh: true
         };
       }
-      
+
       // Handle other errors
       const errorMsg = json?.error || json?.message || `Server error: ${res.status}`;
       const isUnsupportedMethod = res.status === 405;
-      
+
       if (isUnsupportedMethod) {
         return {
           ok: false,
@@ -578,7 +578,7 @@ export default function MortalityPage() {
           suggestRecreate: true
         };
       }
-      
+
       return {
         ok: false,
         status: res.status,
@@ -596,7 +596,7 @@ export default function MortalityPage() {
     try {
       const url = `${API_BASE}${ENDPOINTS.mortality}/${recordId}`;
       const headers = await getAuthHeaders();
-      
+
       const res = await fetch(url, {
         method: 'DELETE',
         headers,
@@ -606,7 +606,7 @@ export default function MortalityPage() {
       let json = null;
       try {
         json = JSON.parse(text);
-      } catch {}
+      } catch { }
 
       if (res.ok) {
         return {
@@ -637,7 +637,7 @@ export default function MortalityPage() {
   const handleFormSubmit = async () => {
     if (!formData.lokasi || !formData.varietas || !formData.totalTanamanSaatIni) {
       Alert.alert(
-        'Form Tidak Lengkap', 
+        'Form Tidak Lengkap',
         'Harap isi semua kolom yang wajib.',
         [{ text: 'Mengerti', style: 'default' }]
       );
@@ -648,7 +648,7 @@ export default function MortalityPage() {
     if (editingRecord) {
       // Handle UPDATE operation
       const recordId = editingRecord.detail.id || editingRecord.detail._id || editingRecord.detail.mortality_id;
-      
+
       if (!recordId) {
         Alert.alert(
           'Kesalahan Edit',
@@ -661,7 +661,7 @@ export default function MortalityPage() {
       // Create update payload using the correct backend format
       // Determine the action and quantity based on what's being edited
       let action, quantity, reason;
-      
+
       if (parseInt(formData.tanamanMati, 10) > 0) {
         // User is updating mortality count
         action = 'REMOVE';
@@ -684,9 +684,9 @@ export default function MortalityPage() {
         quantity,
         reason
       };
-      
+
       const res = await updateToApi(recordId, updatePayload);
-      
+
       if (res && res.ok) {
         Alert.alert(
           'Berhasil',
@@ -699,7 +699,7 @@ export default function MortalityPage() {
                 setShowForm(false);
                 setEditingRecord(null);
                 resetForm();
-                
+
                 // Always refresh data after update, with delay if needed
                 if (res.needsRefresh) {
                   setTimeout(() => {
@@ -733,7 +733,7 @@ export default function MortalityPage() {
                     // Get location and variant IDs from mappings
                     const locationId = locationIdMap[formData.lokasi];
                     const variantId = variantIdMap[formData.varietas];
-                    
+
                     if (!locationId) {
                       Alert.alert(
                         'Kesalahan',
@@ -742,7 +742,7 @@ export default function MortalityPage() {
                       );
                       return;
                     }
-                    
+
                     if (!variantId) {
                       Alert.alert(
                         'Kesalahan',
@@ -751,7 +751,7 @@ export default function MortalityPage() {
                       );
                       return;
                     }
-                    
+
                     // Create new record with updated data
                     const createPayload = {
                       location_id: locationId,
@@ -766,11 +766,11 @@ export default function MortalityPage() {
                         reason: "Plant mortality"
                       }
                     };
-                    
+
                     const createRes = await postToApi(createPayload);
                     if (createRes.ok) {
                       Alert.alert(
-                        'Berhasil', 
+                        'Berhasil',
                         'Data berhasil diperbarui dengan mengganti record lama.',
                         [{ text: 'Selesai', style: 'default' }]
                       );
@@ -781,21 +781,21 @@ export default function MortalityPage() {
                       fetchMortality();
                     } else {
                       Alert.alert(
-                        'Gagal', 
+                        'Gagal',
                         'Gagal membuat data baru: ' + createRes.msg,
                         [{ text: 'Mengerti', style: 'default' }]
                       );
                     }
                   } else {
                     Alert.alert(
-                      'Gagal', 
+                      'Gagal',
                       'Gagal menghapus data lama: ' + deleteRes.msg,
                       [{ text: 'Mengerti', style: 'default' }]
                     );
                   }
                 } catch (error) {
                   Alert.alert(
-                    'Kesalahan', 
+                    'Kesalahan',
                     'Terjadi kesalahan saat memperbarui data.',
                     [{ text: 'Mengerti', style: 'default' }]
                   );
@@ -806,17 +806,17 @@ export default function MortalityPage() {
         );
       } else {
         Alert.alert(
-          'Gagal', 
+          'Gagal',
           res?.msg || 'Gagal memperbarui data. Silakan coba lagi.',
           [{ text: 'Mengerti', style: 'default' }]
         );
       }
-      
+
     } else {
       // Handle CREATE operation using the correct nested API format
       if ((parseInt(formData.tanamanMati, 10) || 0) === 0 && (parseInt(formData.tanamanSulam, 10) || 0) === 0) {
         Alert.alert(
-          'Form Tidak Lengkap', 
+          'Form Tidak Lengkap',
           'Harap isi minimal satu nilai (Tanaman Mati atau Tanaman Sulam).',
           [{ text: 'Mengerti', style: 'default' }]
         );
@@ -826,7 +826,7 @@ export default function MortalityPage() {
       // Get location and variant IDs from mappings
       const locationId = locationIdMap[formData.lokasi];
       const variantId = variantIdMap[formData.varietas];
-      
+
       if (!locationId) {
         Alert.alert(
           'Kesalahan',
@@ -835,7 +835,7 @@ export default function MortalityPage() {
         );
         return;
       }
-      
+
       if (!variantId) {
         Alert.alert(
           'Kesalahan',
@@ -858,7 +858,7 @@ export default function MortalityPage() {
           reason: "Plants died from disease"
         }
       };
-      
+
       const res = await postToApi(mortalityRecord);
 
       if (res && res.ok) {
@@ -880,7 +880,7 @@ export default function MortalityPage() {
         );
       } else {
         Alert.alert(
-          'Gagal', 
+          'Gagal',
           res?.msg || 'Gagal mengirim data. Silakan coba lagi.',
           [{ text: 'Mengerti', style: 'default' }]
         );
@@ -889,7 +889,7 @@ export default function MortalityPage() {
   };
 
   return (
-    <ScreenLayout 
+    <ScreenLayout
       headerTitle="Mortality"
       headerLogoSvg={backArrowSvg}
       onHeaderLeftPress={() => navigation.navigate('Home')}
@@ -897,256 +897,256 @@ export default function MortalityPage() {
       <TouchableWithoutFeedback onPress={() => { Keyboard.dismiss(); closeAllDropdowns(); }}>
         <View style={styles.contentContainer}>
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-        onScrollBeginDrag={closeAllDropdowns}
-      >
-        <Text style={styles.title}>MORTALITY</Text>
-        
-        {/* Server Status Alert */}
-        {serverStatus === 'offline' && (
-          <View style={styles.serverAlert}>
-            <View style={styles.alertIcon}>
-              <Text style={styles.alertIconText}>⚠️</Text>
-            </View>
-            <View style={styles.alertContent}>
-              <Text style={styles.alertTitle}>Pemeliharaan Server</Text>
-              <Text style={styles.alertMessage}>
-                Kami sedang melakukan pemeliharaan server. Anda masih dapat melihat dan menguji antarmuka dengan data contoh.
-              </Text>
-            </View>
-          </View>
-        )}
-        
-        {serverStatus === 'connecting' && (
-          <View style={styles.connectingAlert}>
-            <ActivityIndicator size="small" color="#1D4949" />
-            <Text style={styles.connectingText}>Menghubungkan ke server...</Text>
-          </View>
-        )}
-        
-        <TouchableOpacity style={styles.updateButton} onPress={toggleForm}>
-          <Text style={styles.updateButtonText}>+ Perbaharui</Text>
-        </TouchableOpacity>
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+            onScrollBeginDrag={closeAllDropdowns}
+          >
+            <Text style={styles.title}>MORTALITY</Text>
 
-        {/* Inline Form */}
-        {showForm && (
-          <View style={styles.formContainer}>
-            <View style={styles.fieldSpacing}>
-              <Text style={styles.label}>Tanggal<Text style={styles.required}>*</Text></Text>
-              <TouchableOpacity 
-                style={styles.inputBox} 
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={styles.inputText}>
-                  {formData.tanggal.toLocaleDateString('id-ID')}
-                </Text>
-                <SvgXml xml={calendarSvg} width={20} height={20} />
-              </TouchableOpacity>
-              {showDatePicker && (
-                <DateTimePicker 
-                  value={formData.tanggal} 
-                  mode="date" 
-                  display="default"
-                  onChange={(e, date) => { 
-                    setShowDatePicker(false); 
-                    if (date) {
-                      setFormData(prev => ({ ...prev, tanggal: date }));
-                    }
-                  }}
-                />
-              )}
-            </View>
-
-            <View style={styles.fieldSpacing}>
-              <Text style={styles.label}>Lokasi<Text style={styles.required}>*</Text></Text>
-              <DropdownInput 
-                value={formData.lokasi} 
-                onPress={() => setFormDropdownOpen(prev => ({ ...prev, lokasi: !prev.lokasi }))} 
-                placeholder="Pilih Lokasi"
-              />
-              {formDropdownOpen.lokasi && (
-                <DropdownBox 
-                  items={lokasiOptions} 
-                  onSelect={(opt) => { 
-                    // Auto-fill total plants when location is selected
-                    const selectedLocation = mortalityData.find(item => item.location_name === opt);
-                    const totalPlants = selectedLocation?.total_plants || '';
-                    
-                    setFormData(prev => ({ 
-                      ...prev, 
-                      lokasi: opt,
-                      totalTanamanSaatIni: totalPlants.toString()
-                    }));
-                    closeAllDropdowns(); 
-                  }} 
-                />
-              )}
-            </View>
-
-            <View style={styles.fieldSpacing}>
-              <Text style={styles.label}>Varietas<Text style={styles.required}>*</Text></Text>
-              <DropdownInput 
-                value={formData.varietas} 
-                onPress={() => setFormDropdownOpen(prev => ({ ...prev, varietas: !prev.varietas }))} 
-                placeholder="Pilih Varietas"
-              />
-              {formDropdownOpen.varietas && (
-                <DropdownBox 
-                  items={varietasOptions} 
-                  onSelect={(opt) => { 
-                    setFormData(prev => ({ ...prev, varietas: opt }));
-                    closeAllDropdowns(); 
-                  }} 
-                />
-              )}
-            </View>
-
-            <Text style={styles.sectionTitle}>
-              {editingRecord ? 'Edit Data Mortalitas' : 'Input Mortalitas'}
-            </Text>
-
-            <View style={styles.mortalityContainer}>
-              <View style={styles.mortalityRow}>
-                <Text style={styles.mortalityLabel}>Total Tanaman Saat Ini</Text>
-                <View style={styles.inputWithUnit}>
-                  <TextInput 
-                    style={[styles.mortalityInput, styles.readOnly]} 
-                    value={formData.totalTanamanSaatIni} 
-                    editable={false}
-                    placeholder="8000"
-                  />
-                  <Text style={styles.unitLabel}>tanaman</Text>
+            {/* Server Status Alert */}
+            {serverStatus === 'offline' && (
+              <View style={styles.serverAlert}>
+                <View style={styles.alertIcon}>
+                  <Text style={styles.alertIconText}>⚠️</Text>
+                </View>
+                <View style={styles.alertContent}>
+                  <Text style={styles.alertTitle}>Pemeliharaan Server</Text>
+                  <Text style={styles.alertMessage}>
+                    Kami sedang melakukan pemeliharaan server. Anda masih dapat melihat dan menguji antarmuka dengan data contoh.
+                  </Text>
                 </View>
               </View>
+            )}
 
-              <View style={styles.mortalityRowHalf}>
-                <View style={styles.halfInput}>
-                  <Text style={styles.mortalityLabel}>Tanaman Mati</Text>
-                  <TextInput 
-                    style={styles.mortalityInputSmall} 
-                    value={formData.tanamanMati} 
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, tanamanMati: text }))}
-                    keyboardType="number-pad"
-                    placeholder="0"
-                  />
-                </View>
-                <View style={styles.halfInput}>
-                  <Text style={styles.mortalityLabel}>Tanaman Sulam</Text>
-                  <TextInput 
-                    style={styles.mortalityInputSmall} 
-                    value={formData.tanamanSulam} 
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, tanamanSulam: text }))}
-                    keyboardType="number-pad"
-                    placeholder="0"
-                  />
-                </View>
+            {serverStatus === 'connecting' && (
+              <View style={styles.connectingAlert}>
+                <ActivityIndicator size="small" color="#1D4949" />
+                <Text style={styles.connectingText}>Menghubungkan ke server...</Text>
               </View>
+            )}
 
-              <View style={styles.mortalityRow}>
-                <Text style={styles.mortalityLabel}>Total Tanaman Setelahnya</Text>
-                <View style={styles.inputWithUnit}>
-                  <TextInput 
-                    style={[styles.mortalityInput, styles.readOnly]} 
-                    value={formData.totalTanamanSetelahnya} 
-                    editable={false}
+            <TouchableOpacity style={styles.updateButton} onPress={toggleForm}>
+              <Text style={styles.updateButtonText}>+ Perbaharui</Text>
+            </TouchableOpacity>
+
+            {/* Inline Form */}
+            {showForm && (
+              <View style={styles.formContainer}>
+                <View style={styles.fieldSpacing}>
+                  <Text style={styles.label}>Tanggal<Text style={styles.required}>*</Text></Text>
+                  <TouchableOpacity
+                    style={styles.inputBox}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <Text style={styles.inputText}>
+                      {formData.tanggal.toLocaleDateString('id-ID')}
+                    </Text>
+                    <SvgXml xml={calendarSvg} width={20} height={20} />
+                  </TouchableOpacity>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={formData.tanggal}
+                      mode="date"
+                      display="default"
+                      onChange={(e, date) => {
+                        setShowDatePicker(false);
+                        if (date) {
+                          setFormData(prev => ({ ...prev, tanggal: date }));
+                        }
+                      }}
+                    />
+                  )}
+                </View>
+
+                <View style={styles.fieldSpacing}>
+                  <Text style={styles.label}>Lokasi<Text style={styles.required}>*</Text></Text>
+                  <DropdownInput
+                    value={formData.lokasi}
+                    onPress={() => setFormDropdownOpen(prev => ({ ...prev, lokasi: !prev.lokasi }))}
+                    placeholder="Pilih Lokasi"
                   />
-                  <Text style={styles.unitLabel}>tanaman</Text>
+                  {formDropdownOpen.lokasi && (
+                    <DropdownBox
+                      items={lokasiOptions}
+                      onSelect={(opt) => {
+                        // Auto-fill total plants when location is selected
+                        const selectedLocation = mortalityData.find(item => item.location_name === opt);
+                        const totalPlants = selectedLocation?.total_plants || '';
+
+                        setFormData(prev => ({
+                          ...prev,
+                          lokasi: opt,
+                          totalTanamanSaatIni: totalPlants.toString()
+                        }));
+                        closeAllDropdowns();
+                      }}
+                    />
+                  )}
                 </View>
-              </View>
-            </View>
 
-            <View style={styles.formButtonRow}>
-              <TouchableOpacity style={[styles.formButton, styles.simpanButton]} onPress={handleFormSubmit}>
-                <Text style={styles.buttonText}>
-                  {editingRecord ? 'Perbarui' : 'Simpan'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.formButton, styles.resetButton]} onPress={resetForm}>
-                <Text style={styles.buttonText}>
-                  {editingRecord ? 'Batal' : 'Reset'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {(loading.mortality || loading.lokasi) && <ActivityIndicator size="large" color="#1D4949" style={{ marginTop: 20 }} />}
-        {error && <Text style={styles.errorText}>Kesalahan: {error}</Text>}
-
-        <View style={styles.mainContainer}>
-          <View style={styles.table}>
-            <View style={styles.headerRow}>
-              <Text style={[styles.headerText, styles.locationColumn]}>Lokasi</Text>
-              <Text style={[styles.headerText, styles.plantColumn]}>Jumlah Tanaman</Text>
-            </View>
-
-            {mortalityData.map((item, index) => (
-            <View key={index}>
-              <TouchableOpacity style={styles.dataRow} onPress={() => toggleExpand(item.location_name)}>
-                <View style={styles.locationCell}>
-                  <SvgXml xml={expandedLocation === item.location_name ? upArrowSvg : downArrowSvg} width={12} height={8} />
-                  <Text style={styles.locationText}>{item.location_name}</Text>
+                <View style={styles.fieldSpacing}>
+                  <Text style={styles.label}>Varietas<Text style={styles.required}>*</Text></Text>
+                  <DropdownInput
+                    value={formData.varietas}
+                    onPress={() => setFormDropdownOpen(prev => ({ ...prev, varietas: !prev.varietas }))}
+                    placeholder="Pilih Varietas"
+                  />
+                  {formDropdownOpen.varietas && (
+                    <DropdownBox
+                      items={varietasOptions}
+                      onSelect={(opt) => {
+                        setFormData(prev => ({ ...prev, varietas: opt }));
+                        closeAllDropdowns();
+                      }}
+                    />
+                  )}
                 </View>
-                <Text style={styles.plantText}>{item.total_plants}</Text>
-              </TouchableOpacity>
 
-              {expandedLocation === item.location_name && (
-                <View style={styles.expandedSection}>
-                  <View style={styles.summaryContainer}>
-                    <View style={styles.summaryItem}>
-                      <Text style={styles.summaryLabel}>Tanaman Kosong</Text>
-                      <Text style={styles.summaryValue}>: {item.summary.tanaman_kosong}</Text>
-                    </View>
-                    <View style={styles.summaryItem}>
-                      <Text style={styles.summaryLabel}>Tanaman Mati</Text>
-                      <Text style={styles.summaryValue}>: {item.summary.tanaman_mati}</Text>
-                    </View>
-                    <View style={styles.summaryItem}>
-                      <Text style={styles.summaryLabel}>Tanaman Sulam</Text>
-                      <Text style={styles.summaryValue}>: {item.summary.tanaman_sulam}</Text>
+                <Text style={styles.sectionTitle}>
+                  {editingRecord ? 'Edit Data Mortalitas' : 'Input Mortalitas'}
+                </Text>
+
+                <View style={styles.mortalityContainer}>
+                  <View style={styles.mortalityRow}>
+                    <Text style={styles.mortalityLabel}>Total Tanaman Saat Ini</Text>
+                    <View style={styles.inputWithUnit}>
+                      <TextInput
+                        style={[styles.mortalityInput, styles.readOnly]}
+                        value={formData.totalTanamanSaatIni}
+                        editable={false}
+                        placeholder="8000"
+                      />
+                      <Text style={styles.unitLabel}>tanaman</Text>
                     </View>
                   </View>
 
-                  <View style={styles.detailTable}>
-                    <View style={styles.detailHeader}>
-                      <Text style={[styles.detailHeaderText, styles.dateColumn]}>Tanggal</Text>
-                      <Text style={[styles.detailHeaderText, styles.statusColumn]}>Status</Text>
-                      <Text style={[styles.detailHeaderText, styles.quantityColumn]}>Jumlah</Text>
-                      <Text style={[styles.detailHeaderText, styles.menuColumn]}>Aksi</Text>
+                  <View style={styles.mortalityRowHalf}>
+                    <View style={styles.halfInput}>
+                      <Text style={styles.mortalityLabel}>Tanaman Mati</Text>
+                      <TextInput
+                        style={styles.mortalityInputSmall}
+                        value={formData.tanamanMati}
+                        onChangeText={(text) => setFormData(prev => ({ ...prev, tanamanMati: text }))}
+                        keyboardType="number-pad"
+                        placeholder="0"
+                      />
                     </View>
-                    {item.details.map((detail, detailIndex) => (
-                      <View key={detailIndex} style={styles.detailRow}>
-                        <Text style={[styles.detailText, styles.dateColumn]}>{detail.date}</Text>
-                        <View style={[styles.detailText, styles.statusColumn]}>
-                          <Text>{detail.status}</Text>
+                    <View style={styles.halfInput}>
+                      <Text style={styles.mortalityLabel}>Tanaman Sulam</Text>
+                      <TextInput
+                        style={styles.mortalityInputSmall}
+                        value={formData.tanamanSulam}
+                        onChangeText={(text) => setFormData(prev => ({ ...prev, tanamanSulam: text }))}
+                        keyboardType="number-pad"
+                        placeholder="0"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.mortalityRow}>
+                    <Text style={styles.mortalityLabel}>Total Tanaman Setelahnya</Text>
+                    <View style={styles.inputWithUnit}>
+                      <TextInput
+                        style={[styles.mortalityInput, styles.readOnly]}
+                        value={formData.totalTanamanSetelahnya}
+                        editable={false}
+                      />
+                      <Text style={styles.unitLabel}>tanaman</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.formButtonRow}>
+                  <TouchableOpacity style={[styles.formButton, styles.simpanButton]} onPress={handleFormSubmit}>
+                    <Text style={styles.buttonText}>
+                      {editingRecord ? 'Perbarui' : 'Simpan'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.formButton, styles.resetButton]} onPress={resetForm}>
+                    <Text style={styles.buttonText}>
+                      {editingRecord ? 'Batal' : 'Reset'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {(loading.mortality || loading.lokasi) && <ActivityIndicator size="large" color="#1D4949" style={{ marginTop: 20 }} />}
+            {error && <Text style={styles.errorText}>Kesalahan: {error}</Text>}
+
+            <View style={styles.mainContainer}>
+              <View style={styles.table}>
+                <View style={styles.headerRow}>
+                  <Text style={[styles.headerText, styles.locationColumn]}>Lokasi</Text>
+                  <Text style={[styles.headerText, styles.plantColumn]}>Jumlah Tanaman</Text>
+                </View>
+
+                {mortalityData.map((item, index) => (
+                  <View key={index}>
+                    <TouchableOpacity style={styles.dataRow} onPress={() => toggleExpand(item.location_name)}>
+                      <View style={styles.locationCell}>
+                        <SvgXml xml={expandedLocation === item.location_name ? upArrowSvg : downArrowSvg} width={12} height={8} />
+                        <Text style={styles.locationText}>{item.location_name}</Text>
+                      </View>
+                      <Text style={styles.plantText}>{item.total_plants}</Text>
+                    </TouchableOpacity>
+
+                    {expandedLocation === item.location_name && (
+                      <View style={styles.expandedSection}>
+                        <View style={styles.summaryContainer}>
+                          <View style={styles.summaryItem}>
+                            <Text style={styles.summaryLabel}>Tanaman Kosong</Text>
+                            <Text style={styles.summaryValue}>: {item.summary.tanaman_kosong}</Text>
+                          </View>
+                          <View style={styles.summaryItem}>
+                            <Text style={styles.summaryLabel}>Tanaman Mati</Text>
+                            <Text style={styles.summaryValue}>: {item.summary.tanaman_mati}</Text>
+                          </View>
+                          <View style={styles.summaryItem}>
+                            <Text style={styles.summaryLabel}>Tanaman Sulam</Text>
+                            <Text style={styles.summaryValue}>: {item.summary.tanaman_sulam}</Text>
+                          </View>
                         </View>
-                        <Text style={[styles.detailText, styles.quantityColumn]}>{detail.quantity}</Text>
-                        <View style={[styles.menuCell, styles.menuColumn]}>
-                          <TouchableOpacity 
-                            style={styles.actionButton}
-                            onPress={() => handleEditRecord(item.location_name, detail)}
-                          >
-                            <SvgXml xml={editIconSvg} width={16} height={16} />
-                          </TouchableOpacity>
-                          <TouchableOpacity 
-                            style={styles.actionButton}
-                            onPress={() => handleDeleteRecord(item.location_name, detail)}
-                          >
-                            <SvgXml xml={deleteIconSvg} width={16} height={16} />
-                          </TouchableOpacity>
+
+                        <View style={styles.detailTable}>
+                          <View style={styles.detailHeader}>
+                            <Text style={[styles.detailHeaderText, styles.dateColumn]}>Tanggal</Text>
+                            <Text style={[styles.detailHeaderText, styles.statusColumn]}>Status</Text>
+                            <Text style={[styles.detailHeaderText, styles.quantityColumn]}>Jumlah</Text>
+                            <Text style={[styles.detailHeaderText, styles.menuColumn]}>Aksi</Text>
+                          </View>
+                          {item.details.map((detail, detailIndex) => (
+                            <View key={detailIndex} style={styles.detailRow}>
+                              <Text style={[styles.detailText, styles.dateColumn]}>{detail.date}</Text>
+                              <View style={[styles.detailText, styles.statusColumn]}>
+                                <Text>{detail.status}</Text>
+                              </View>
+                              <Text style={[styles.detailText, styles.quantityColumn]}>{detail.quantity}</Text>
+                              <View style={[styles.menuCell, styles.menuColumn]}>
+                                <TouchableOpacity
+                                  style={styles.actionButton}
+                                  onPress={() => handleEditRecord(item.location_name, detail)}
+                                >
+                                  <SvgXml xml={editIconSvg} width={16} height={16} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={styles.actionButton}
+                                  onPress={() => handleDeleteRecord(item.location_name, detail)}
+                                >
+                                  <SvgXml xml={deleteIconSvg} width={16} height={16} />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          ))}
                         </View>
                       </View>
-                    ))}
+                    )}
                   </View>
-                </View>
-              )}
+                ))}
+              </View>
             </View>
-          ))}
-        </View>
-        </View>
-      </ScrollView>
+          </ScrollView>
         </View>
       </TouchableWithoutFeedback>
     </ScreenLayout>
@@ -1167,7 +1167,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center', overflow: 'hidden',
   },
 
-  
+
   title: {
     fontSize: 36,
     fontWeight: 'bold',
@@ -1175,7 +1175,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  
+
   // Server Status Alert Styles
   serverAlert: {
     flexDirection: 'row',
@@ -1389,14 +1389,14 @@ const styles = StyleSheet.create({
     color: '#8B2D2D',
   },
   inputBox: {
-    borderWidth: 1, 
-    borderColor: '#ddd', 
-    borderRadius: 8, 
-    height: 48, 
-    paddingHorizontal: 12, 
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    height: 48,
+    paddingHorizontal: 12,
     backgroundColor: '#fff',
-    flexDirection: 'row', 
-    alignItems: 'center', 
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between'
   },
   inputText: {
@@ -1467,14 +1467,14 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
   },
-  readOnly: { 
+  readOnly: {
     backgroundColor: '#f5f5f5',
     color: '#666',
   },
-  formButtonRow: { 
-    flexDirection: 'row', 
-    gap: 8, 
-    marginTop: 24 
+  formButtonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 24
   },
   formButton: {
     flex: 1,
@@ -1482,10 +1482,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
   },
-  simpanButton: { 
+  simpanButton: {
     backgroundColor: '#1D4949'
   },
-  resetButton: { 
+  resetButton: {
     backgroundColor: '#8B2D2D'
   },
   cancelButton: {

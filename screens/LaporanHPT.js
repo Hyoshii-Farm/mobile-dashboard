@@ -35,7 +35,7 @@ const filterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20
 const getDefaultDateRange = () => {
   const today = new Date();
   const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  
+
   // Calculate days to go back to last Monday (Monday of last week)
   // If today is Monday (1), last Monday is 7 days ago
   // If today is Tuesday-Saturday (2-6), last Monday is (currentDay + 7) days ago
@@ -48,15 +48,15 @@ const getDefaultDateRange = () => {
   } else {
     daysToLastMonday = currentDay + 7; // Tuesday-Saturday: currentDay + 7
   }
-  
+
   const lastMonday = new Date(today);
   lastMonday.setDate(today.getDate() - daysToLastMonday);
   lastMonday.setHours(0, 0, 0, 0);
-  
+
   const lastSunday = new Date(lastMonday);
   lastSunday.setDate(lastMonday.getDate() + 6);
   lastSunday.setHours(23, 59, 59, 999);
-  
+
   return { startDate: lastMonday, endDate: lastSunday };
 };
 
@@ -122,30 +122,30 @@ export default function LaporanHPTPage() {
   const fetchLocationOptions = useCallback(async () => {
     try {
       setLoading((prev) => ({ ...prev, locations: true }));
-      
+
       const headers = await getAuthHeaders();
-      const url = `${API_BASE}/location/dropdown?search&concise=true&nursery=false&pageSize=100`;
-      
+      const url = `${API_BASE}/location/list?search&concise=true&nursery=false&pageSize=100&org_code=org_b56b8313086`;
+
       const response = await fetch(url, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const result = await response.json();
       const locations = result.data || result || [];
       setLocationObjects(locations);
-      
+
       const locationNames = locations
         .map(getLocationName)
         .filter(name => name && name.trim().length > 0);
-      
+
       const uniqueLocations = Array.from(new Set(locationNames)).sort();
       setLocationOptions(uniqueLocations);
-      
+
       // Select all by default
       setSelectedLocations(uniqueLocations);
-      
+
     } catch (error) {
       Alert.alert(
         'Gagal Memuat Data',
@@ -162,26 +162,26 @@ export default function LaporanHPTPage() {
     try {
       const headers = await getAuthHeaders();
       const url = `${API_BASE}/hama?ops=true&pest=true`;
-      
+
       const response = await fetch(url, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const result = await response.json();
       const pests = result.data || result || [];
       const pestNames = pests
         .map(item => item?.name || item?.nama || item?.label || String(item))
         .filter(name => name && name.trim().length > 0);
-      
+
       setPestOptions(pestNames);
-      
+
       // Set first pest as default if none selected
       if (!selectedPest && pestNames.length > 0) {
         setSelectedPest(pestNames[0]);
       }
-      
+
     } catch (error) {
       console.error('Failed to fetch pest options:', error);
     }
@@ -192,26 +192,26 @@ export default function LaporanHPTPage() {
     try {
       const headers = await getAuthHeaders();
       const url = `${API_BASE}/hama?ops=true&pest=false`;
-      
+
       const response = await fetch(url, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const result = await response.json();
       const diseases = result.data || result || [];
       const diseaseNames = diseases
         .map(item => item?.name || item?.nama || item?.label || String(item))
         .filter(name => name && name.trim().length > 0);
-      
+
       setDiseaseOptions(diseaseNames);
-      
+
       // Set first disease as default if none selected
       if (!selectedDisease && diseaseNames.length > 0) {
         setSelectedDisease(diseaseNames[0]);
       }
-      
+
     } catch (error) {
       console.error('Failed to fetch disease options:', error);
     }
@@ -247,46 +247,46 @@ export default function LaporanHPTPage() {
 
     try {
       setLoading((prev) => ({ ...prev, hpt: true }));
-      
+
       const headers = await getAuthHeaders();
       const locationIds = getLocationIds();
       const startDateStr = formatDate(startDate);
       const endDateStr = formatDate(endDate);
-      
-      const url = `${API_BASE}/report/ops/hpt?location_id=${locationIds}&startDate=${startDateStr}&endDate=${endDateStr}&period=daily`;
-      
+
+      const url = `${API_BASE}/report/hpt?location_id=${locationIds}&startDate=${startDateStr}&endDate=${endDateStr}&period=daily`;
+
       const response = await fetch(url, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const result = await response.json();
-      
+
       // Get the appropriate section (pest or disease)
       const section = activeType === 'Hama' ? result.pest : result.disease;
       if (!section || !section.trend) {
         setHptData({ average: 0, previousAverage: 0, locations: [] });
         return;
       }
-      
+
       // Find the selected pest/disease in the trend array
       const trendItem = section.trend.find(item => item.name === selectedItem);
-      
+
       if (!trendItem) {
         setHptData({ average: 0, previousAverage: 0, locations: [] });
         return;
       }
-      
+
       // Get KPI data for average calculation
       const kpi = section.kpi || {};
       const itemNameLower = selectedItem.toLowerCase().replace(/\s+/g, '_');
       const totalKey = `total_${itemNameLower}`;
       const lastWeekKey = `last_week_total_${itemNameLower}`;
-      
+
       const average = kpi[totalKey] || 0;
       const previousAverage = kpi[lastWeekKey] || 0;
-      
+
       // Transform locations data
       // Filter to only show locations that are:
       // 1. Not hidden
@@ -309,34 +309,34 @@ export default function LaporanHPTPage() {
                 // Datetime format: "2025-09-17 00:00:00" -> "2025-09-17"
                 dateValue = dateStr.split(' ')[0];
               }
-              
+
               // Check if score exists (not undefined/null), but allow 0
               const score = d.score;
               if (score === undefined || score === null) {
                 return null; // Will be filtered out
               }
-              
+
               return {
                 date: dateValue,
                 value: score,
               };
             })
             .filter(d => d !== null); // Remove entries with undefined/null values
-          
+
           return {
             name: loc.location_name || '',
             data: data,
           };
         });
-      
+
       const transformed = {
         average: average,
         previousAverage: previousAverage,
         locations: locations,
       };
-      
+
       setHptData(transformed);
-      
+
     } catch (error) {
       console.error('Failed to fetch HPT data:', error);
       Alert.alert(
@@ -504,7 +504,7 @@ export default function LaporanHPTPage() {
   const renderLineGraph = (data, locationName) => {
     // Clean data: skip undefined/null but keep zero values
     const cleanedData = (data || []).filter(d => d.value !== undefined && d.value !== null);
-    
+
     if (!cleanedData || cleanedData.length === 0) {
       return (
         <View style={styles.emptyGraph}>
@@ -517,7 +517,7 @@ export default function LaporanHPTPage() {
     const graphHeight = 240;
     const padding = 40;
     const minDataPointWidth = 40; // Minimum width per data point
-    
+
     // Calculate dynamic width: ensure minimum width per data point for readability
     const minWidth = Math.max(baseGraphWidth, cleanedData.length * minDataPointWidth);
     const chartWidth = minWidth - padding * 2;
@@ -555,113 +555,113 @@ export default function LaporanHPTPage() {
 
     return (
       <View style={styles.graphContainer}>
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ minWidth: minWidth }}
         >
           <Svg width={minWidth} height={graphHeight}>
-          {/* Grid lines */}
-          <Line
-            x1={padding}
-            y1={padding}
-            x2={padding}
-            y2={padding + chartHeight}
-            stroke="#E0E0E0"
-            strokeWidth="1"
-          />
-          <Line
-            x1={padding}
-            y1={padding + chartHeight}
-            x2={padding + chartWidth}
-            y2={padding + chartHeight}
-            stroke="#E0E0E0"
-            strokeWidth="1"
-          />
+            {/* Grid lines */}
+            <Line
+              x1={padding}
+              y1={padding}
+              x2={padding}
+              y2={padding + chartHeight}
+              stroke="#E0E0E0"
+              strokeWidth="1"
+            />
+            <Line
+              x1={padding}
+              y1={padding + chartHeight}
+              x2={padding + chartWidth}
+              y2={padding + chartHeight}
+              stroke="#E0E0E0"
+              strokeWidth="1"
+            />
 
-          {/* Reference lines */}
-          <Line
-            x1={padding}
-            y1={warningLineY}
-            x2={padding + chartWidth}
-            y2={warningLineY}
-            stroke="#FF9800"
-            strokeWidth="1"
-            strokeDasharray="4,4"
-          />
-          <Line
-            x1={padding}
-            y1={dangerLineY}
-            x2={padding + chartWidth}
-            y2={dangerLineY}
-            stroke="#F44336"
-            strokeWidth="1"
-            strokeDasharray="4,4"
-          />
+            {/* Reference lines */}
+            <Line
+              x1={padding}
+              y1={warningLineY}
+              x2={padding + chartWidth}
+              y2={warningLineY}
+              stroke="#FF9800"
+              strokeWidth="1"
+              strokeDasharray="4,4"
+            />
+            <Line
+              x1={padding}
+              y1={dangerLineY}
+              x2={padding + chartWidth}
+              y2={dangerLineY}
+              stroke="#F44336"
+              strokeWidth="1"
+              strokeDasharray="4,4"
+            />
 
-          {/* Data line */}
-          <Polyline
-            points={points}
-            fill="none"
-            stroke="#64B5F6"
-            strokeWidth="2"
-          />
+            {/* Data line */}
+            <Polyline
+              points={points}
+              fill="none"
+              stroke="#64B5F6"
+              strokeWidth="2"
+            />
 
-          {/* Data points */}
-          {cleanedData.map((d, index) => {
-            const x = padding + index * xStep;
-            const y = padding + chartHeight - (d.value - minValue) * yScale;
-            return (
-              <Circle
-                key={index}
-                cx={x}
-                cy={y}
-                r={pointRadius}
-                fill="#64B5F6"
-              />
-            );
-          })}
+            {/* Data points */}
+            {cleanedData.map((d, index) => {
+              const x = padding + index * xStep;
+              const y = padding + chartHeight - (d.value - minValue) * yScale;
+              return (
+                <Circle
+                  key={index}
+                  cx={x}
+                  cy={y}
+                  r={pointRadius}
+                  fill="#64B5F6"
+                />
+              );
+            })}
 
-          {/* Y-axis labels */}
-          {[0, 5, 10].map((value) => {
-            const y = padding + chartHeight - (value - minValue) * yScale;
-            return (
-              <SvgText
-                key={value}
-                x={padding - 10}
-                y={y + 4}
-                fontSize="10"
-                fill="#666"
-                textAnchor="end"
-              >
-                {value}
-              </SvgText>
-            );
-          })}
+            {/* Y-axis labels */}
+            {[0, 5, 10].map((value) => {
+              const y = padding + chartHeight - (value - minValue) * yScale;
+              return (
+                <SvgText
+                  key={value}
+                  x={padding - 10}
+                  y={y + 4}
+                  fontSize="10"
+                  fill="#666"
+                  textAnchor="end"
+                >
+                  {value}
+                </SvgText>
+              );
+            })}
 
-          {/* X-axis labels (dates) - limited to max 6 labels */}
-          {cleanedData.map((d, index) => {
-            // Only show label if it matches the interval
-            const showLabel = index % labelInterval === 0;
-            if (!showLabel) return null;
-            
-            const x = padding + index * xStep;
-            const labelY = padding + chartHeight + 25;
-            return (
-              <SvgText
-                key={index}
-                x={x}
-                y={labelY}
-                fontSize="9"
-                fill="#666"
-                textAnchor="middle"
-                transform={`rotate(-45 ${x} ${labelY})`}
-              >
-                {d.date.split('-').slice(1).join('/')}
-              </SvgText>
-            );
-          })}
-        </Svg>
+            {/* X-axis labels (dates) - limited to max 6 labels */}
+            {cleanedData.map((d, index) => {
+              // Only show label if it matches the interval
+              const showLabel = index % labelInterval === 0;
+              if (!showLabel) return null;
+
+              const x = padding + index * xStep;
+              const labelY = padding + chartHeight + 25;
+              return (
+                <SvgText
+                  key={index}
+                  x={x}
+                  y={labelY}
+                  fontSize="9"
+                  fill="#666"
+                  textAnchor="middle"
+                  transform={`rotate(-45 ${x} ${labelY})`}
+                >
+                  {d.date.split('-').slice(1).join('/')}
+                </SvgText>
+              );
+            })}
+          </Svg>
         </ScrollView>
 
         {/* Legend */}
@@ -776,17 +776,17 @@ export default function LaporanHPTPage() {
 
         {/* Summary Statistics */}
         {(loading.hpt || hptData.locations.length > 0 || hptData.average > 0) && (
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>
               Rata Rata {activeType === 'Hama' ? (selectedPest || 'Hama') : (selectedDisease || 'Penyakit')}
-          </Text>
+            </Text>
             <Text style={styles.summaryValue}>
               {formatPercentage(hptData.average)} <Text style={styles.summaryUnit}>({formatPercentage(Math.abs(calculatePercentageChange(hptData.average, hptData.previousAverage)))})</Text>
             </Text>
-          <Text style={styles.summaryPrevious}>
-            periode lalu : {formatPercentage(hptData.previousAverage)}
-          </Text>
-        </View>
+            <Text style={styles.summaryPrevious}>
+              periode lalu : {formatPercentage(hptData.previousAverage)}
+            </Text>
+          </View>
         )}
 
         {/* Location Sections */}

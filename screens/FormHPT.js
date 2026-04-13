@@ -34,7 +34,7 @@ export default function FormHPT() {
   const [tanggal, setTanggal] = useState(new Date());
   const [lokasi, setLokasi] = useState('');
   const [lokasiId, setLokasiId] = useState(null);
-  
+
   // Pest configuration with score levels based on Figma
   const pestConfig = {
     'Ulat': { levels: 1, pest_id: null },
@@ -60,7 +60,7 @@ export default function FormHPT() {
   const [dropdownOpen, setDropdownOpen] = useState({
     lokasi: false,
   });
-  
+
   // Options
   const [lokasiOptions, setLokasiOptions] = useState([]);
   const [lokasiObjects, setLokasiObjects] = useState([]);
@@ -114,7 +114,8 @@ export default function FormHPT() {
     let totalPagesKnown = null;
 
     while (page <= MAX_PAGES) {
-      const url = `${API_BASE}${path}?page=${page}&pageSize=${pageSize}`;
+      const orgParam = path === '/location/list' ? '&org_code=org_b56b8313086' : '';
+      const url = `${API_BASE}${path}?page=${page}&pageSize=${pageSize}${orgParam}`;
       const res = await fetch(url, { headers });
       if (!res.ok) {
         const txt = await res.text().catch(() => '');
@@ -146,7 +147,7 @@ export default function FormHPT() {
     setLoading((s) => ({ ...s, lokasi: true }));
     setError(null);
     try {
-      const all = await fetchAllPages('/location/dropdown');
+      const all = await fetchAllPages('/location/list');
       setLokasiObjects(all);
       const labels = Array.from(new Set(all.map(toLabel).filter(Boolean))).sort((a, b) => a.localeCompare(b));
       setLokasiOptions(labels);
@@ -161,14 +162,14 @@ export default function FormHPT() {
   const loadHama = useCallback(async () => {
     try {
       const headers = await getAuthHeaders();
-      
+
       const baseUrl = `${API_BASE}/hama`;
       const params = new URLSearchParams({
         ops: 'true',
         pest: 'true'
       });
       const url = `${baseUrl}?${params.toString()}`;
-      
+
       const response = await fetch(url, { headers });
 
       if (!response.ok) {
@@ -189,12 +190,12 @@ export default function FormHPT() {
       } else if (Array.isArray(result?.results)) {
         all = result.results;
       }
-      
+
       setHamaObjects(all);
-      
+
       // Map pest names to IDs from API
       const configCopy = { ...pestConfig };
-      
+
       const apiToConfigMapping = {
         'Ulat': 'Ulat',
         'Siput': 'Siput',
@@ -203,12 +204,12 @@ export default function FormHPT() {
         'Spidermites': 'Spidermites',
         'Mildew Insidensi': 'Mildew'
       };
-      
+
       // Map API pests to our config
       all.forEach(pest => {
         const pestName = toLabel(pest);
         const pestId = idFrom(pest, ['id', 'pest_id', 'hama_id']);
-        
+
         if (pestName && pestId) {
           Object.keys(apiToConfigMapping).forEach(apiName => {
             if (pestName === apiName) {
@@ -220,12 +221,12 @@ export default function FormHPT() {
           });
         }
       });
-      
+
       // Update the global pestConfig with found IDs
       Object.keys(configCopy).forEach(key => {
         pestConfig[key].pest_id = configCopy[key].pest_id;
       });
-      
+
     } catch (e) {
       console.error('[FormHPT] Failed to load pests:', e);
     }
@@ -291,7 +292,7 @@ export default function FormHPT() {
         if (value !== '' && parseInt(value, 10) > 0) hasScoreEntries = true;
       });
     });
-    
+
     if (!hasScoreEntries) {
       Alert.alert('Data Tidak Lengkap', 'Harap isi setidaknya satu data skor.');
       return;
@@ -299,57 +300,57 @@ export default function FormHPT() {
 
     try {
       const headers = await getAuthHeaders();
-      
+
       // Build the payload according to API specification
       const pests = [];
-      
+
       Object.keys(pestScores).forEach(pestName => {
         const pestScoreData = pestScores[pestName];
         const scores = [];
-        
+
         // Get the number of levels for this pest from pestConfig
         const pestLevels = pestConfig[pestName]?.levels || 1;
-        
+
         // Include ALL score levels (1 to pestLevels), whether filled or not
         for (let level = 1; level <= pestLevels; level++) {
           const plantCount = pestScoreData[level];
           const actualPlantCount = (plantCount && plantCount !== '') ? parseInt(plantCount, 10) || 0 : 0;
-          
+
           scores.push({
             score: level,
             plant_count: actualPlantCount,
           });
         }
-        
+
         // Get pest_id from pestConfig first, then fall back to hamaObjects
         let pestId = pestConfig[pestName]?.pest_id || null;
-        
+
         if (!pestId) {
           // Try to find pest_id from hamaObjects with better matching
           const pestObj = hamaObjects.find(h => {
             const label = toLabel(h);
             if (!label) return false;
-            
+
             // Exact match first
             if (label.toLowerCase() === pestName.toLowerCase()) return true;
-            
+
             // Partial match
             return label.toLowerCase().includes(pestName.toLowerCase()) ||
-                   pestName.toLowerCase().includes(label.toLowerCase());
+              pestName.toLowerCase().includes(label.toLowerCase());
           });
-          
+
           if (pestObj) {
             pestId = idFrom(pestObj, ['id', 'pest_id', 'hama_id']);
           }
         }
-        
+
         // Always add the pest with ALL its score levels
         const pestData = {
           pest_id: pestId,
           name: pestName,
           scores: scores,
         };
-        
+
         pests.push(pestData);
       });
 
@@ -358,7 +359,7 @@ export default function FormHPT() {
       if (pestsWithoutId.length > 0) {
         const pestNames = pestsWithoutId.map(p => p.name).join(', ');
         Alert.alert(
-          'Pest ID Tidak Ditemukan', 
+          'Pest ID Tidak Ditemukan',
           `Pest berikut tidak memiliki ID yang valid: ${pestNames}. Server memerlukan pest_id untuk semua entri. Silakan coba lagi atau hubungi admin.`,
           [{ text: 'OK' }]
         );
@@ -388,7 +389,7 @@ export default function FormHPT() {
   const submitData = async (payload, headers) => {
     try {
       const url = `${API_BASE}/hpt`;
-      
+
       const res = await fetch(url, {
         method: 'POST',
         headers,
@@ -457,8 +458,8 @@ export default function FormHPT() {
         showHomeButton={false}
       />
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer} 
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={closeAllDropdowns}
         showsVerticalScrollIndicator={true}
@@ -466,178 +467,178 @@ export default function FormHPT() {
         scrollEventThrottle={16}
         style={styles.scrollView}
       >
-          <Text style={styles.formTitle}>HAMA PENYAKIT TANAMAN</Text>
+        <Text style={styles.formTitle}>HAMA PENYAKIT TANAMAN</Text>
 
-          {!!error && <Text style={styles.errorText}>⚠️ {error}</Text>}
+        {!!error && <Text style={styles.errorText}>⚠️ {error}</Text>}
 
-          {/* Tanggal */}
-          <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Tanggal<Text style={styles.required}>*</Text></Text>
-            <TouchableOpacity style={styles.inputBox} onPress={() => setShowTanggal(true)}>
-              <Text style={styles.inputText}>{formatDate(tanggal)}</Text>
-              <SvgXml xml={calendarSvg} width={20} height={20} />
-            </TouchableOpacity>
-            {showTanggal && (
-              <DateTimePicker 
-                value={tanggal} 
-                mode="date" 
-                display="default"
-                onChange={(e, date) => { 
-                  setShowTanggal(false); 
-                  if (date) setTanggal(date); 
-                }}
-              />
-            )}
+        {/* Tanggal */}
+        <View style={styles.fieldSpacing}>
+          <Text style={styles.label}>Tanggal<Text style={styles.required}>*</Text></Text>
+          <TouchableOpacity style={styles.inputBox} onPress={() => setShowTanggal(true)}>
+            <Text style={styles.inputText}>{formatDate(tanggal)}</Text>
+            <SvgXml xml={calendarSvg} width={20} height={20} />
+          </TouchableOpacity>
+          {showTanggal && (
+            <DateTimePicker
+              value={tanggal}
+              mode="date"
+              display="default"
+              onChange={(e, date) => {
+                setShowTanggal(false);
+                if (date) setTanggal(date);
+              }}
+            />
+          )}
+        </View>
+
+        {/* Lokasi */}
+        <View style={styles.fieldSpacing}>
+          <Text style={styles.label}>Lokasi<Text style={styles.required}>*</Text></Text>
+          <TouchableOpacity
+            style={styles.inputBox}
+            onPress={() => setDropdownOpen(prev => ({ ...prev, lokasi: !prev.lokasi }))}
+          >
+            <Text style={[styles.inputText, !lokasi && { color: '#999' }]}>
+              {lokasi || 'Select Location'}
+            </Text>
+            <SvgXml
+              xml={`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M11.6087 1.5738L6.14086 7.04163L0.673035 1.5738L1.94886 0.297978L6.14086 4.48998L10.3329 0.297978L11.6087 1.5738Z" fill="#8B4513"/></svg>`}
+              width={12}
+              height={8}
+            />
+          </TouchableOpacity>
+          {dropdownOpen.lokasi && (
+            <DropdownBox
+              items={lokasiOptions}
+              onSelect={(option) => {
+                setLokasi(option);
+                setLokasiId(lokasiIdByLabel[option] || null);
+                closeAllDropdowns();
+              }}
+            />
+          )}
+        </View>
+
+        {/* Ulat Section */}
+        <Text style={styles.pestTitle}>ULAT</Text>
+        <View style={styles.pestContainer}>
+          <View style={styles.scoreRow}>
+            <Text style={styles.scoreLabel}>Tanaman yang terinfeksi</Text>
+            <TextInput
+              style={styles.scoreInput}
+              value={pestScores['Ulat'][1]}
+              onChangeText={(value) => handleScoreChange('Ulat', 1, value)}
+              keyboardType="number-pad"
+              placeholder="0"
+              placeholderTextColor="#999"
+            />
           </View>
+        </View>
 
-          {/* Lokasi */}
-          <View style={styles.fieldSpacing}>
-            <Text style={styles.label}>Lokasi<Text style={styles.required}>*</Text></Text>
-            <TouchableOpacity 
-              style={styles.inputBox} 
-              onPress={() => setDropdownOpen(prev => ({ ...prev, lokasi: !prev.lokasi }))}
-            >
-              <Text style={[styles.inputText, !lokasi && { color: '#999' }]}>
-                {lokasi || 'Select Location'}
-              </Text>
-              <SvgXml 
-                xml={`<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M11.6087 1.5738L6.14086 7.04163L0.673035 1.5738L1.94886 0.297978L6.14086 4.48998L10.3329 0.297978L11.6087 1.5738Z" fill="#8B4513"/></svg>`}
-                width={12} 
-                height={8} 
-              />
-            </TouchableOpacity>
-            {dropdownOpen.lokasi && (
-              <DropdownBox
-                items={lokasiOptions}
-                onSelect={(option) => {
-                  setLokasi(option);
-                  setLokasiId(lokasiIdByLabel[option] || null);
-                  closeAllDropdowns();
-                }}
-              />
-            )}
+        {/* Siput Section */}
+        <Text style={styles.pestTitle}>SIPUT</Text>
+        <View style={styles.pestContainer}>
+          <View style={styles.scoreRow}>
+            <Text style={styles.scoreLabel}>Tanaman yang terinfeksi</Text>
+            <TextInput
+              style={styles.scoreInput}
+              value={pestScores['Siput'][1]}
+              onChangeText={(value) => handleScoreChange('Siput', 1, value)}
+              keyboardType="number-pad"
+              placeholder="0"
+              placeholderTextColor="#999"
+            />
           </View>
+        </View>
 
-          {/* Ulat Section */}
-          <Text style={styles.pestTitle}>ULAT</Text>
-          <View style={styles.pestContainer}>
-            <View style={styles.scoreRow}>
-              <Text style={styles.scoreLabel}>Tanaman yang terinfeksi</Text>
+        {/* Aphids Section */}
+        <Text style={styles.pestTitle}>APHIDS</Text>
+        <View style={styles.pestContainer}>
+          {[1, 2, 3].map((level) => (
+            <View key={level} style={styles.scoreRow}>
+              <Text style={styles.scoreLabel}>Tingkat : {level}</Text>
               <TextInput
                 style={styles.scoreInput}
-                value={pestScores['Ulat'][1]}
-                onChangeText={(value) => handleScoreChange('Ulat', 1, value)}
+                value={pestScores['Aphids'][level]}
+                onChangeText={(value) => handleScoreChange('Aphids', level, value)}
                 keyboardType="number-pad"
                 placeholder="0"
                 placeholderTextColor="#999"
               />
             </View>
-          </View>
+          ))}
+        </View>
 
-          {/* Siput Section */}
-          <Text style={styles.pestTitle}>SIPUT</Text>
-          <View style={styles.pestContainer}>
-            <View style={styles.scoreRow}>
-              <Text style={styles.scoreLabel}>Tanaman yang terinfeksi</Text>
+        {/* Thrips Section */}
+        <Text style={styles.pestTitle}>THRIPS</Text>
+        <View style={styles.pestContainer}>
+          {[1, 2, 3, 4, 5, 6, 7].map((level) => (
+            <View key={level} style={styles.scoreRow}>
+              <Text style={styles.scoreLabel}>Tingkat : {level}</Text>
               <TextInput
                 style={styles.scoreInput}
-                value={pestScores['Siput'][1]}
-                onChangeText={(value) => handleScoreChange('Siput', 1, value)}
+                value={pestScores['Thrips'][level]}
+                onChangeText={(value) => handleScoreChange('Thrips', level, value)}
                 keyboardType="number-pad"
                 placeholder="0"
                 placeholderTextColor="#999"
               />
             </View>
-          </View>
+          ))}
+        </View>
 
-          {/* Aphids Section */}
-          <Text style={styles.pestTitle}>APHIDS</Text>
-          <View style={styles.pestContainer}>
-            {[1, 2, 3].map((level) => (
-              <View key={level} style={styles.scoreRow}>
-                <Text style={styles.scoreLabel}>Tingkat : {level}</Text>
-                <TextInput
-                  style={styles.scoreInput}
-                  value={pestScores['Aphids'][level]}
-                  onChangeText={(value) => handleScoreChange('Aphids', level, value)}
-                  keyboardType="number-pad"
-                  placeholder="0"
-                  placeholderTextColor="#999"
-                />
-              </View>
-            ))}
-          </View>
+        {/* Spidermites Section */}
+        <Text style={styles.pestTitle}>SPIDERMITES</Text>
+        <View style={styles.pestContainer}>
+          {[1, 2, 3, 4, 5].map((level) => (
+            <View key={level} style={styles.scoreRow}>
+              <Text style={styles.scoreLabel}>Tingkat : {level}</Text>
+              <TextInput
+                style={styles.scoreInput}
+                value={pestScores['Spidermites'][level]}
+                onChangeText={(value) => handleScoreChange('Spidermites', level, value)}
+                keyboardType="number-pad"
+                placeholder="0"
+                placeholderTextColor="#999"
+              />
+            </View>
+          ))}
+        </View>
 
-          {/* Thrips Section */}
-          <Text style={styles.pestTitle}>THRIPS</Text>
-          <View style={styles.pestContainer}>
-            {[1, 2, 3, 4, 5, 6, 7].map((level) => (
-              <View key={level} style={styles.scoreRow}>
-                <Text style={styles.scoreLabel}>Tingkat : {level}</Text>
-                <TextInput
-                  style={styles.scoreInput}
-                  value={pestScores['Thrips'][level]}
-                  onChangeText={(value) => handleScoreChange('Thrips', level, value)}
-                  keyboardType="number-pad"
-                  placeholder="0"
-                  placeholderTextColor="#999"
-                />
-              </View>
-            ))}
-          </View>
+        {/* Mildew Section */}
+        <Text style={styles.pestTitle}>MILDEW</Text>
+        <View style={styles.pestContainer}>
+          {[1, 2, 3, 4].map((level) => (
+            <View key={level} style={styles.scoreRow}>
+              <Text style={styles.scoreLabel}>Tingkat : {level}</Text>
+              <TextInput
+                style={styles.scoreInput}
+                value={pestScores['Mildew'][level]}
+                onChangeText={(value) => handleScoreChange('Mildew', level, value)}
+                keyboardType="number-pad"
+                placeholder="0"
+                placeholderTextColor="#999"
+              />
+            </View>
+          ))}
+        </View>
 
-          {/* Spidermites Section */}
-          <Text style={styles.pestTitle}>SPIDERMITES</Text>
-          <View style={styles.pestContainer}>
-            {[1, 2, 3, 4, 5].map((level) => (
-              <View key={level} style={styles.scoreRow}>
-                <Text style={styles.scoreLabel}>Tingkat : {level}</Text>
-                <TextInput
-                  style={styles.scoreInput}
-                  value={pestScores['Spidermites'][level]}
-                  onChangeText={(value) => handleScoreChange('Spidermites', level, value)}
-                  keyboardType="number-pad"
-                  placeholder="0"
-                  placeholderTextColor="#999"
-                />
-              </View>
-            ))}
-          </View>
-
-          {/* Mildew Section */}
-          <Text style={styles.pestTitle}>MILDEW</Text>
-          <View style={styles.pestContainer}>
-            {[1, 2, 3, 4].map((level) => (
-              <View key={level} style={styles.scoreRow}>
-                <Text style={styles.scoreLabel}>Tingkat : {level}</Text>
-                <TextInput
-                  style={styles.scoreInput}
-                  value={pestScores['Mildew'][level]}
-                  onChangeText={(value) => handleScoreChange('Mildew', level, value)}
-                  keyboardType="number-pad"
-                  placeholder="0"
-                  placeholderTextColor="#999"
-                />
-              </View>
-            ))}
-          </View>
-
-          {/* Buttons */}
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.button, styles.simpanButton]}
-              onPress={handleSimpan}
-            >
-              <Text style={styles.buttonText}>Simpan</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.resetButton]}
-              onPress={resetForm}
-            >
-              <Text style={styles.buttonText}>Reset</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+        {/* Buttons */}
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[styles.button, styles.simpanButton]}
+            onPress={handleSimpan}
+          >
+            <Text style={styles.buttonText}>Simpan</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, styles.resetButton]}
+            onPress={resetForm}
+          >
+            <Text style={styles.buttonText}>Reset</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </View>
   );
 }

@@ -33,21 +33,21 @@ const filterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20
 const getDefaultDateRange = () => {
   const today = new Date();
   const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  
+
   // Calculate days to go back to last Monday
   // If today is Monday (1), go back 7 days
   // If today is Tuesday (2), go back 8 days
   // If today is Sunday (0), go back 6 days
   const daysToLastMonday = currentDay === 0 ? 6 : currentDay + 6;
-  
+
   const lastMonday = new Date(today);
   lastMonday.setDate(today.getDate() - daysToLastMonday);
   lastMonday.setHours(0, 0, 0, 0);
-  
+
   const lastSunday = new Date(lastMonday);
   lastSunday.setDate(lastMonday.getDate() + 6);
   lastSunday.setHours(23, 59, 59, 999);
-  
+
   return { startDate: lastMonday, endDate: lastSunday };
 };
 
@@ -105,7 +105,7 @@ export default function LaporanProduksiPage() {
     try {
       const audience = process.env.EXPO_PUBLIC_KINDE_AUDIENCE;
       const token = await getAccessToken(audience);
-      
+
       return {
         Accept: 'application/json',
         'Content-Type': 'application/json',
@@ -130,33 +130,33 @@ export default function LaporanProduksiPage() {
   const fetchLocationOptions = useCallback(async () => {
     try {
       setLoading((prev) => ({ ...prev, locations: true }));
-      
+
       const headers = await getAuthHeaders();
-      const url = `${API_BASE}/location/dropdown?search&concise=true&nursery=false&pageSize=100`;
-      
+      const url = `${API_BASE}/location/list?search&concise=true&nursery=false&pageSize=100&org_code=org_b56b8313086`;
+
       const response = await fetch(url, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const result = await response.json();
-      
+
       // Store full location objects
       const locations = result.data || result || [];
       setLocationObjects(locations);
-      
+
       // Extract location names for display
       const locationNames = locations
         .map(getLocationName)
         .filter(name => name && name.trim().length > 0);
-      
+
       const uniqueLocations = Array.from(new Set(locationNames)).sort();
       setLocationOptions(uniqueLocations);
-      
+
       // Select all locations by default
       setSelectedLocations(uniqueLocations);
-      
+
     } catch (error) {
       console.error('Failed to fetch locations:', error);
       Alert.alert(
@@ -213,7 +213,7 @@ export default function LaporanProduksiPage() {
     if (value === null || value === undefined || !isFinite(value)) {
       return '0';
     }
-    
+
     const numValue = Number(value);
     if (decimals > 0) {
       const fixed = numValue.toFixed(decimals);
@@ -251,53 +251,53 @@ export default function LaporanProduksiPage() {
 
     try {
       setLoading((prev) => ({ ...prev, production: true }));
-      
+
       const headers = await getAuthHeaders();
       const locationIds = getLocationIds();
       const startDateStr = formatDate(startDate);
       const endDateStr = formatDate(endDate);
-      
-      const url = `${API_BASE}/report/ops/production?start_date=${startDateStr}&end_date=${endDateStr}&period=daily&location_id=${locationIds}&unit=kg`;
-      
+
+      const url = `${API_BASE}/report/production?start_date=${startDateStr}&end_date=${endDateStr}&period=daily&location_id=${locationIds}&unit=kg`;
+
       const response = await fetch(url, { headers });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const result = await response.json();
-      
+
       // Transform API response to match UI structure
       const packingKpi = result.packing?.kpi || {};
       const tochioVariant = packingKpi.total_by_variant?.find(v => v.name === 'Tochiotome') || {};
       const momokaVariant = packingKpi.total_by_variant?.find(v => v.name === 'Momoka') || {};
-      
+
       const rejectKpi = result.reject?.kpi || {};
       const rejectRatio = result.reject?.ratio || {};
-      
+
       const harvestKpi = result.harvest?.kpi || {};
       const harvestEfficiency = result.harvest?.efficiency || {};
       const harvestDetail = result.harvest?.detail?.detail || [];
-      
+
       const FLOAT32_MAX = 3.4028235e+38;
       const FLOAT32_MIN = -3.4028235e+38;
       const isPlaceholderValue = (val) => {
         return val === FLOAT32_MAX || val === FLOAT32_MIN;
       };
-      
+
       const packingDetails = [];
-      
+
       if (packingKpi.detail && Array.isArray(packingKpi.detail) && packingKpi.detail.length > 0) {
         packingKpi.detail.forEach(d => {
           const location = d.location || d.name || '';
           if (!location || location.trim().length === 0) return;
-          
+
           const hasLowest = d.lowest !== undefined && d.lowest !== null && !isPlaceholderValue(d.lowest);
           const hasHighest = d.highest !== undefined && d.highest !== null && !isPlaceholderValue(d.highest);
           const hasActual = d.actual !== undefined && d.actual !== null && !isPlaceholderValue(d.actual);
-          
+
           if (!hasLowest && !hasHighest && (!hasActual || d.actual === 0)) return;
-          
+
           packingDetails.push({
             location: location,
             lowest: hasLowest ? d.lowest : (hasActual && !hasHighest ? d.actual : 0),
@@ -310,13 +310,13 @@ export default function LaporanProduksiPage() {
         const lowestValue = packingKpi.lowest;
         const highestLocation = packingKpi.highest_location || '';
         const highestValue = packingKpi.highest;
-        
-        if (lowestValue !== undefined && 
-            lowestValue !== null && 
-            !isPlaceholderValue(lowestValue) && 
-            lowestValue !== 0 &&
-            lowestLocation && 
-            lowestLocation.trim().length > 0) {
+
+        if (lowestValue !== undefined &&
+          lowestValue !== null &&
+          !isPlaceholderValue(lowestValue) &&
+          lowestValue !== 0 &&
+          lowestLocation &&
+          lowestLocation.trim().length > 0) {
           packingDetails.push({
             location: lowestLocation,
             lowest: lowestValue,
@@ -324,13 +324,13 @@ export default function LaporanProduksiPage() {
             percentage: packingKpi.diff_lowest || 0,
           });
         }
-        
-        if (highestValue !== undefined && 
-            highestValue !== null && 
-            !isPlaceholderValue(highestValue) && 
-            highestValue !== 0 &&
-            highestLocation && 
-            highestLocation.trim().length > 0) {
+
+        if (highestValue !== undefined &&
+          highestValue !== null &&
+          !isPlaceholderValue(highestValue) &&
+          highestValue !== 0 &&
+          highestLocation &&
+          highestLocation.trim().length > 0) {
           packingDetails.push({
             location: highestLocation,
             lowest: 0,
@@ -339,7 +339,7 @@ export default function LaporanProduksiPage() {
           });
         }
       }
-      
+
       // Get location data for packing contribution
       const packingLocationData = result.packing?.location || [];
       const packingLocationDetails = packingLocationData.map(loc => ({
@@ -374,9 +374,9 @@ export default function LaporanProduksiPage() {
             const rejectAmount = d.actual || 0;
             const harvestAmount = harvestLocationData?.harvest || 0;
             const totalAmount = harvestAmount + rejectAmount;
-            
+
             let calculatedRatio = 0;
-            
+
             if (rejectAmount > 0 && rejectAmount <= 1) {
               calculatedRatio = rejectAmount * 100;
             } else if (rejectAmount > 0 && rejectAmount <= 100 && harvestAmount === 0) {
@@ -387,7 +387,7 @@ export default function LaporanProduksiPage() {
             } else if (rejectAmount > 0) {
               calculatedRatio = 0;
             }
-            
+
             return {
               location: d.name || '',
               reject: rejectAmount,
@@ -412,7 +412,7 @@ export default function LaporanProduksiPage() {
             } else if (d.efficiency !== undefined && d.efficiency !== null) {
               percentage = d.efficiency - (harvestEfficiency.last_actual || 0);
             }
-            
+
             return {
               location: d.location || '',
               kg: d.harvest || 0,
@@ -423,9 +423,9 @@ export default function LaporanProduksiPage() {
           }),
         },
       };
-      
+
       setProductionData(transformed);
-      
+
     } catch (error) {
       console.error('Failed to fetch production data:', error);
       Alert.alert(
@@ -476,8 +476,8 @@ export default function LaporanProduksiPage() {
         <View style={styles.dateRow}>
           <View style={styles.dateField}>
             <Text style={styles.dateLabel}>Dari</Text>
-            <TouchableOpacity 
-              style={styles.dateInput} 
+            <TouchableOpacity
+              style={styles.dateInput}
               onPress={() => setShowStartPicker(true)}
             >
               <Text style={styles.dateText}>
@@ -488,8 +488,8 @@ export default function LaporanProduksiPage() {
 
           <View style={styles.dateField}>
             <Text style={styles.dateLabel}>Hingga</Text>
-            <TouchableOpacity 
-              style={styles.dateInput} 
+            <TouchableOpacity
+              style={styles.dateInput}
               onPress={() => setShowEndPicker(true)}
             >
               <Text style={styles.dateText}>
@@ -668,7 +668,7 @@ export default function LaporanProduksiPage() {
   const renderPackingTab = () => {
     const packing = productionData.packing || {};
     const locationDetails = packing.locationDetails || [];
-    
+
     const totalPack = packing.totalPack || 0;
     const periodePack = packing.periodePack || 0;
     const totalTochio = packing.totalTochio || 0;
@@ -681,7 +681,7 @@ export default function LaporanProduksiPage() {
     const highestValue = packing.highestValue;
     const lowestPercentage = packing.lowestPercentage || 0;
     const highestPercentage = packing.highestPercentage || 0;
-    
+
     return (
       <View>
         {/* Total Cards */}
@@ -691,7 +691,7 @@ export default function LaporanProduksiPage() {
             {formatIndonesianNumber(totalPack)} <Text style={styles.cardUnit}>pack ({formatPercentage(totalPack, periodePack)})</Text>
           </Text>
           <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodePack)} pack</Text>
-          
+
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
@@ -700,7 +700,7 @@ export default function LaporanProduksiPage() {
                 {lowestValue === null ? '-' : `${formatIndonesianNumber(lowestValue)} pack`} <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPercentage)})</Text>
               </Text>
             </View>
-            
+
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
               <Text style={styles.cardDetailLocation}>{highestLocation || '-'}</Text>
@@ -717,7 +717,7 @@ export default function LaporanProduksiPage() {
             {formatIndonesianNumber(totalTochio)} <Text style={styles.cardUnit}>pack ({formatPercentage(totalTochio, periodeTochio)})</Text>
           </Text>
           <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeTochio)} pack</Text>
-          
+
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
@@ -726,7 +726,7 @@ export default function LaporanProduksiPage() {
                 {lowestValue === null ? '-' : `${formatIndonesianNumber(lowestValue)} pack`} <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPercentage)})</Text>
               </Text>
             </View>
-            
+
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
               <Text style={styles.cardDetailLocation}>{highestLocation || '-'}</Text>
@@ -743,7 +743,7 @@ export default function LaporanProduksiPage() {
             {formatIndonesianNumber(totalMomoka)} <Text style={styles.cardUnit}>pack ({formatPercentage(totalMomoka, periodeMomoka)})</Text>
           </Text>
           <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeMomoka)} pack</Text>
-          
+
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
@@ -752,7 +752,7 @@ export default function LaporanProduksiPage() {
                 {lowestValue === null ? '-' : `${formatIndonesianNumber(lowestValue)} pack`} <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPercentage)})</Text>
               </Text>
             </View>
-            
+
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
               <Text style={styles.cardDetailLocation}>{highestLocation || '-'}</Text>
@@ -774,10 +774,10 @@ export default function LaporanProduksiPage() {
                 </View>
               );
             }
-            
+
             const sortedDetails = [...locationDetails].sort((a, b) => (b.quantity || 0) - (a.quantity || 0));
             const maxValue = Math.max(...sortedDetails.map(d => d.quantity || 0), 1);
-            
+
             return renderBarChart(
               sortedDetails,
               (item) => item.quantity || 0,
@@ -795,12 +795,12 @@ export default function LaporanProduksiPage() {
   const renderRejectTab = () => {
     const reject = productionData.reject || {};
     const details = reject.details || [];
-    
+
     let lowestRejectDetail = {};
     let highestRejectDetail = {};
     let lowestRatioDetail = {};
     let highestRatioDetail = {};
-    
+
     if (details.length > 0) {
       // Find lowest and highest reject amounts (in kg)
       const rejectAmounts = details.map(d => d.reject || 0);
@@ -808,7 +808,7 @@ export default function LaporanProduksiPage() {
       const maxReject = Math.max(...rejectAmounts);
       lowestRejectDetail = details.find(d => (d.reject || 0) === minReject) || details[0] || {};
       highestRejectDetail = details.find(d => (d.reject || 0) === maxReject) || details[0] || {};
-      
+
       // Find lowest and highest ratios
       const ratios = details.map(d => d.ratio || 0);
       const minRatio = Math.min(...ratios);
@@ -816,7 +816,7 @@ export default function LaporanProduksiPage() {
       lowestRatioDetail = details.find(d => (d.ratio || 0) === minRatio) || details[0] || {};
       highestRatioDetail = details.find(d => (d.ratio || 0) === maxRatio) || details[0] || {};
     }
-    
+
     const totalRatio = reject.totalRatio || 0;
     const periodeRatio = reject.periodeRatio || 0;
     const totalReject = reject.totalReject || 0;
@@ -825,7 +825,7 @@ export default function LaporanProduksiPage() {
     const highestRatio = highestRatioDetail.ratio || 0;
     const lowestRatioPercentage = lowestRatioDetail.percentage || 0;
     const highestRatioPercentage = highestRatioDetail.percentage || 0;
-    
+
     return (
       <View>
         <View style={styles.totalCard}>
@@ -834,7 +834,7 @@ export default function LaporanProduksiPage() {
             {formatIndonesianNumber(totalReject, 1)} <Text style={styles.cardUnit}>Kg ({formatPercentage(totalReject, periodeReject)})</Text>
           </Text>
           <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeReject, 1)} Kg</Text>
-          
+
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
@@ -843,7 +843,7 @@ export default function LaporanProduksiPage() {
                 {formatIndonesianNumber(lowestRejectDetail.reject || 0, 1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestRejectDetail.percentage || 0)})</Text>
               </Text>
             </View>
-            
+
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
               <Text style={styles.cardDetailLocation}>{highestRejectDetail.location || '-'}</Text>
@@ -860,7 +860,7 @@ export default function LaporanProduksiPage() {
             {formatIndonesianNumber(totalRatio, 1)}<Text style={styles.cardUnit}>% ({formatPercentage(totalRatio, periodeRatio)})</Text>
           </Text>
           <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeRatio, 1)}%</Text>
-          
+
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
@@ -869,7 +869,7 @@ export default function LaporanProduksiPage() {
                 {formatIndonesianNumber(lowestRatio, 1)}% <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestRatioPercentage)})</Text>
               </Text>
             </View>
-            
+
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
               <Text style={styles.cardDetailLocation}>{highestRatioDetail.location || '-'}</Text>
@@ -886,7 +886,7 @@ export default function LaporanProduksiPage() {
           {details.length > 0 ? (() => {
             const sortedDetails = [...details].sort((a, b) => (b.ratio || 0) - (a.ratio || 0));
             const maxValue = Math.max(...sortedDetails.map(d => d.ratio || 0), 1);
-            
+
             return renderBarChart(
               sortedDetails,
               (item) => item.ratio || 0,
@@ -908,14 +908,14 @@ export default function LaporanProduksiPage() {
   const renderPanenTab = () => {
     const panen = productionData.panen || {};
     const details = panen.details || [];
-    
+
     let lowestPanen = {};
     let highestPanen = {};
     let lowestReject = {};
     let highestReject = {};
     let lowestEfficiency = {};
     let highestEfficiency = {};
-    
+
     if (details.length > 0) {
       lowestPanen = details.reduce((min, d) => (d.kg || 0) < (min.kg || 0) ? d : min, details[0]);
       highestPanen = details.reduce((max, d) => (d.kg || 0) > (max.kg || 0) ? d : max, details[0]);
@@ -924,14 +924,14 @@ export default function LaporanProduksiPage() {
       lowestEfficiency = details.reduce((min, d) => (d.efficiency || 0) < (min.efficiency || 0) ? d : min, details[0]);
       highestEfficiency = details.reduce((max, d) => (d.efficiency || 0) > (max.efficiency || 0) ? d : max, details[0]);
     }
-    
+
     const totalPanen = panen.totalPanen || 0;
     const periodePanen = panen.periodePanen || 0;
     const totalReject = panen.totalReject || 0;
     const periodeReject = panen.periodeReject || 0;
     const efisiensi = panen.efisiensi || 0;
     const periodeEfisiensi = panen.periodeEfisiensi || 0;
-    
+
     return (
       <View>
         <View style={styles.totalCard}>
@@ -940,7 +940,7 @@ export default function LaporanProduksiPage() {
             {formatIndonesianNumber(totalPanen, 1)} <Text style={styles.cardUnit}>Kg ({formatPercentage(totalPanen, periodePanen)})</Text>
           </Text>
           <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodePanen, 1)} Kg</Text>
-          
+
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
@@ -949,7 +949,7 @@ export default function LaporanProduksiPage() {
                 {formatIndonesianNumber(lowestPanen.kg || 0, 1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestPanen.percentage || 0)})</Text>
               </Text>
             </View>
-            
+
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
               <Text style={styles.cardDetailLocation}>{highestPanen.location || '-'}</Text>
@@ -966,7 +966,7 @@ export default function LaporanProduksiPage() {
             {formatIndonesianNumber(totalReject, 1)} <Text style={styles.cardUnit}>Kg ({formatPercentage(totalReject, periodeReject)})</Text>
           </Text>
           <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeReject, 1)} Kg</Text>
-          
+
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
@@ -975,7 +975,7 @@ export default function LaporanProduksiPage() {
                 {formatIndonesianNumber(lowestReject.reject || 0, 1)} Kg <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestReject.percentage || 0)})</Text>
               </Text>
             </View>
-            
+
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
               <Text style={styles.cardDetailLocation}>{highestReject.location || '-'}</Text>
@@ -992,7 +992,7 @@ export default function LaporanProduksiPage() {
             {formatIndonesianNumber(efisiensi, 1)}<Text style={styles.cardUnit}>% ({formatPercentage(efisiensi, periodeEfisiensi)})</Text>
           </Text>
           <Text style={styles.cardPeriode}>periode lalu : {formatIndonesianNumber(periodeEfisiensi, 1)}%</Text>
-          
+
           <View style={styles.cardDetailRow}>
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Terendah</Text>
@@ -1001,7 +1001,7 @@ export default function LaporanProduksiPage() {
                 {formatIndonesianNumber(lowestEfficiency.efficiency || 0, 1)}% <Text style={styles.cardDetailPercent}>({formatPercentageFromValue(lowestEfficiency.percentage || 0)})</Text>
               </Text>
             </View>
-            
+
             <View style={styles.cardDetailItem}>
               <Text style={styles.cardDetailLabel}>Tertinggi</Text>
               <Text style={styles.cardDetailLocation}>{highestEfficiency.location || '-'}</Text>
@@ -1018,7 +1018,7 @@ export default function LaporanProduksiPage() {
           {details.length > 0 ? (() => {
             const sortedDetails = [...details].sort((a, b) => (b.kg || 0) - (a.kg || 0));
             const maxValue = Math.max(...sortedDetails.map(d => d.kg || 0), 1);
-            
+
             return renderBarChart(
               sortedDetails,
               (item) => item.kg || 0,

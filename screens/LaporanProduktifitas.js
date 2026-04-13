@@ -108,7 +108,7 @@ export default function LaporanProduktifitasPage() {
       setLoading((prev) => ({ ...prev, locations: true }));
 
       const headers = await getAuthHeaders();
-      const url = `${API_BASE}/location/dropdown?search&concise=true&nursery=false&pageSize=100`;
+      const url = `${API_BASE}/location/list?search&concise=true&nursery=false&pageSize=100&org_code=org_b56b8313086`;
 
       const response = await fetch(url, { headers });
 
@@ -177,7 +177,7 @@ export default function LaporanProduktifitasPage() {
       const startDateStr = formatDate(startDate);
       const endDateStr = formatDate(endDate);
 
-      const url = `${API_BASE}/report/ops/productivity/heatmap?startDate=${startDateStr}&endDate=${endDateStr}&location_id=${locationIds}`;
+      const url = `${API_BASE}/report/productivity/heatmap?startDate=${startDateStr}&endDate=${endDateStr}&location_id=${locationIds}`;
 
       const response = await fetch(url, { headers });
 
