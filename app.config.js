@@ -25,6 +25,7 @@ module.exports = {
       supportsTablet: true
     },
     android: {
+      backgroundColor: "#1e4a49",
       edgeToEdgeEnabled: true,
       package: "com.hyoshiifarm.hyoshiimobile"
     },
