@@ -25,11 +25,6 @@ module.exports = {
       supportsTablet: true
     },
     android: {
-      adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#1e4a49",
-        mode: "contain"
-      },
       edgeToEdgeEnabled: true,
       package: "com.hyoshiifarm.hyoshiimobile"
     },
