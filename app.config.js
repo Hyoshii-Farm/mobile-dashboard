@@ -10,7 +10,7 @@ module.exports = {
     owner: "hyoshiifarm",
     name: "Hyoshii Grower",
     slug: "hyoshii-mobile",
-    version: "1.0.2",
+    version: "1.0.3",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
@@ -27,7 +27,8 @@ module.exports = {
     android: {
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#ffffff"
+        backgroundColor: "#1e4a49",
+        mode: "contain"
       },
       edgeToEdgeEnabled: true,
       package: "com.hyoshiifarm.hyoshiimobile"
